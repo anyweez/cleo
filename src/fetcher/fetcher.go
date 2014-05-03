@@ -89,7 +89,7 @@ func main() {
 	}
 	
 	fmt.Println(fmt.Sprintf("Loaded %d summoners...let's do this!", len(summoner_ids)))
-	fmt.Println("Writing output every 60 min...")
+	fmt.Println("Writing output every 20 min...")
 	// Forever: pull an summoner ID from user_queue, toss it in retrieval_inputs
 	// and add it back to user_queue.
 	for {
@@ -128,7 +128,7 @@ func retriever(input chan *gamelog.Player, output chan *JSONResponse) {
 // Adaptor to convert the JSON format to GameLog format.
 func record_writer(input chan *JSONResponse) {
 	glog := gamelog.GameLog{}
-	last_write := time.Date(2009, time.November, 05, 3, 10, 30, 0, time.Local)//time.Now()
+	last_write := time.Now()
 	
 	for {
 		response := <- input
@@ -193,7 +193,7 @@ func record_writer(input chan *JSONResponse) {
 		}
 		
 		// Every hour, write out the gamelog and clear memory.
-		if time.Now().Sub(last_write).Minutes() >= 60.0 {
+		if time.Now().Sub(last_write).Minutes() >= 20.0 {
 			write_out(glog)
 			glog = gamelog.GameLog{}
 			
