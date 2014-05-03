@@ -97,7 +97,7 @@ type GameRecord struct {
 	Teams            []*Team `protobuf:"bytes,1,rep,name=teams" json:"teams,omitempty"`
 	Timestamp        *uint64 `protobuf:"varint,2,opt,name=timestamp" json:"timestamp,omitempty"`
 	Duration         *uint32 `protobuf:"varint,3,opt,name=duration" json:"duration,omitempty"`
-	LolkingId        *uint64 `protobuf:"varint,4,opt,name=lolking_id" json:"lolking_id,omitempty"`
+	GameId           *uint64 `protobuf:"varint,4,opt,name=game_id" json:"game_id,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -126,9 +126,9 @@ func (m *GameRecord) GetDuration() uint32 {
 	return 0
 }
 
-func (m *GameRecord) GetLolkingId() uint64 {
-	if m != nil && m.LolkingId != nil {
-		return *m.LolkingId
+func (m *GameRecord) GetGameId() uint64 {
+	if m != nil && m.GameId != nil {
+		return *m.GameId
 	}
 	return 0
 }
@@ -159,7 +159,7 @@ func (m *PlayerRank) GetLeague() PlayerRank_LeagueType {
 
 type Player struct {
 	Name             *string     `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	PlayerId         *uint64     `protobuf:"varint,2,opt,name=player_id" json:"player_id,omitempty"`
+	SummonerId       *uint64     `protobuf:"varint,2,opt,name=summoner_id" json:"summoner_id,omitempty"`
 	Ranking          *PlayerRank `protobuf:"bytes,3,opt,name=ranking" json:"ranking,omitempty"`
 	XXX_unrecognized []byte      `json:"-"`
 }
@@ -175,9 +175,9 @@ func (m *Player) GetName() string {
 	return ""
 }
 
-func (m *Player) GetPlayerId() uint64 {
-	if m != nil && m.PlayerId != nil {
-		return *m.PlayerId
+func (m *Player) GetSummonerId() uint64 {
+	if m != nil && m.SummonerId != nil {
+		return *m.SummonerId
 	}
 	return 0
 }
