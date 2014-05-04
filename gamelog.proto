@@ -44,6 +44,7 @@ message PlayerStats {
 	optional uint32 minions		= 6;
 	
 	optional string champion 	= 7;
+	optional uint32 champion_id	= 8;
 }
 
 message Team {

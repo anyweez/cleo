@@ -197,6 +197,7 @@ type PlayerStats struct {
 	Gold             *uint32 `protobuf:"varint,5,opt,name=gold" json:"gold,omitempty"`
 	Minions          *uint32 `protobuf:"varint,6,opt,name=minions" json:"minions,omitempty"`
 	Champion         *string `protobuf:"bytes,7,opt,name=champion" json:"champion,omitempty"`
+	ChampionId       *uint32 `protobuf:"varint,8,opt,name=champion_id" json:"champion_id,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -251,6 +252,13 @@ func (m *PlayerStats) GetChampion() string {
 		return *m.Champion
 	}
 	return ""
+}
+
+func (m *PlayerStats) GetChampionId() uint32 {
+	if m != nil && m.ChampionId != nil {
+		return *m.ChampionId
+	}
+	return 0
 }
 
 type Team struct {
