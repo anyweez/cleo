@@ -1,0 +1,25 @@
+package proto;
+
+import "gamelog.proto";
+
+// A query that identifies two teams and the outcome state.
+//
+// Of the games that include these team compositions, how many of them
+// resulted in wins for "winners" and losses for "losers"?
+message GameQuery {
+	repeated ChampionType winners = 1;
+	repeated ChampionType losers = 2;
+}
+
+message GameQueryResponse {
+	// The total number of events reviewed.
+	optional uint32 total = 1;
+	
+	// The number of events that contain the requested team compositions
+	// (the denominator).
+	optional uint32 available = 2;
+	
+	// The number of events that contain the team compositions with the
+	// desired outcome (the numerator).
+	optional uint32 matching = 3;
+}

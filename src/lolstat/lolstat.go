@@ -3,17 +3,14 @@ package main
 import "fmt"
 import "gamelog"
 import "query"
-import "math"
-
-// TODO: known data quality error. Some games only include a single team,
-// and it looks like single teams often have < 5 players (1 and 3 seem
-// to occur in 110-sample set). Check process.py for issues with parse_team().
+import "proto"
+import gproto "code.google.com/p/goprotobuf/proto"
 
 type RecordTuple struct {
 	id int
 	
-	Event *gamelog.GameRecord
-	Query *query.Query
+	Event *proto.GameRecord
+	Query *proto.GameQuery
 	
 	filter_condition int
 	labeler_condition int
@@ -44,7 +41,9 @@ const (
 
 func main() {
 	// Kick off some worker goroutines.	
-	filter_in := make(chan *RecordTuple, 250)
+	// NOTE: if there are 1M events then we'll hit deadlock. This limit
+	//   will need to be adjusted.
+	filter_in := make(chan *RecordTuple, 1000000)
 	bridge := make(chan *RecordTuple)
 	label_out := make(chan *RecordTuple)
 	
@@ -63,44 +62,54 @@ func main() {
 	}
 	
 	fmt.Printf("Loading gamelog.\n")
-	game_log := gamelog.Read("/media/vortex/corpora/lolking/test.gamelog")
+	game_log := gamelog.Read("/media/vortex/corpora/lolking/gamelogs/2014-05-04:01.36.gamelog")
 	
 	fmt.Printf("Read in %d games in gamelog.\n", len(game_log.Games))
 	
-	parsed_query := query.ReadFile("queries/thresh.lkg")
+	qm := query.QueryManager{}
+	qm.Connect()
 	
-	///// Running the query /////
+	// Infinitely loop through queries as they come in. Currently this
+	// will only handle one at a time but should be trivial to parallelize
+	// once the time is right.
+	for {
+		q := qm.Await()
 	
-	// Kick off a bunch of filter_event goroutines, then push events
-	// into the channel that they read from.
-	for i, event := range game_log.Games {
-		filter_in <- &RecordTuple{i, event, parsed_query, FILTER_UNTESTED, LABELER_UNTESTED}
-	}
+		///// Running the query /////
 	
-//	filtered := make([]*RecordTuple, len(game_log.Games))
-//	labeled := make([]*RecordTuple, len(game_log.Games))
-	filtered_id := 0
-	labeled_id := 0
+		// Kick off a bunch of filter_event goroutines, then push events
+		// into the channel that they read from.
+		for i, event := range game_log.Games {
+			filter_in <- &RecordTuple{i, event, &q, FILTER_UNTESTED, LABELER_UNTESTED}
+		}
+	
+		var filtered_id uint32 = 0
+		var labeled_id uint32 = 0
 
-	for i := 0; i < len(game_log.Games); i++ {
-		record := <- label_out
+		for i := 0; i < len(game_log.Games); i++ {
+			record := <- label_out
 
-		if record.filter_condition == FILTER_ACCEPTED {
-//			filtered[filtered_id] = record
-			filtered_id += 1
+			if record.filter_condition == FILTER_ACCEPTED {
+				filtered_id += 1
 			
-			if record.labeler_condition == LABELER_ACCEPTED {
-//				labeled[labeled_id] = record
-				labeled_id += 1
+				if record.labeler_condition == LABELER_ACCEPTED {
+					labeled_id += 1
+				}
 			}
 		}
+	
+		response := &proto.GameQueryResponse{}
+		response.Available = gproto.Uint32(filtered_id)
+		response.Matching = gproto.Uint32(labeled_id)
+		response.Total = gproto.Uint32( uint32(len(game_log.Games)) )
+		
+		qm.Respond(response)
+
+//		fmt.Println( "Filtered down to", filtered_id, "/", len(game_log.Games) )
+//		fmt.Println( "Matched down to", labeled_id, "/", filtered_id )
+//		success_rate := float64(labeled_id) / float64(filtered_id)
+//		fmt.Println( "Success rate:", math.Floor(success_rate * 10000) / 100, "%")
 	}
-	
-	fmt.Println( "Filtered down to", filtered_id, "/", len(game_log.Games) )
-	fmt.Println( "Matched down to", labeled_id, "/", filtered_id )
-	success_rate := float64(labeled_id) / float64(filtered_id)
-	
-	fmt.Println( "Success rate:", math.Floor(success_rate * 10000) / 100, "%")
 }
 
 // A goroutine that accepts an event and a query and will return the
@@ -113,25 +122,62 @@ func filter_event(input chan *RecordTuple, output chan *RecordTuple) {
 	for {
 		record := <- input
 		done := false
+
+		// Check if both teams exist, regardless of who won.
+		winner_team := -1
+		loser_team := -1
 		
-		for _, check := range record.Query.Filters {
-			if !check(record.Event, record.Query) && !done {
-				record.filter_condition = FILTER_REJECTED
+		for i, team := range record.Event.Teams {
+			if !done {
+				has_winners := contains_all(team, record.Query.Winners)
+				has_losers := contains_all(team, record.Query.Losers)
+			
+				// If this team doesn't contain winners or losers then it's
+				// impossible for both teams to exist. Reject this record.
+				if !(has_winners || has_losers) {
+					record.filter_condition = FILTER_REJECTED
 				
-				output <- record
-				done = true
+					done = true 
+				} else {
+					// If team matches the Winners requirements and no
+					// matching team has been found yet, set this team
+					// as the "winning" team.
+					if has_winners && winner_team == -1 {
+						winner_team = i
+					// If another "winning" team has been discovered then
+					// this record won't teach us anything, so we should
+					// throw it out.
+					} else if has_winners {
+						record.filter_condition = FILTER_REJECTED
+						
+						done = true
+					}
+					// Same logic for Losers as above.
+					if has_losers && loser_team == -1 {
+						loser_team = i
+					} else if has_losers {
+						record.filter_condition = FILTER_REJECTED
+					
+						done = true
+					}
+				}
 			}
+		} // end for
+		
+		if winner_team >= 0 && loser_team >= 0 {
+			record.filter_condition = FILTER_ACCEPTED
+		} else {
+			record.filter_condition = FILTER_REJECTED
 		}
 		
-		if !done {
-			record.filter_condition = FILTER_ACCEPTED
-			output <- record
-		}
+		output <- record		
 	}	
+
 }
 
 func label_filtered(input chan *RecordTuple, output chan *RecordTuple) {
 	fmt.Println("Running labeler goroutine.")
+	
 	for {
 		record := <- input
 		done := false
@@ -143,20 +189,42 @@ func label_filtered(input chan *RecordTuple, output chan *RecordTuple) {
 			
 			output <- record
 			done = true
-		}
-		
-		for _, check := range record.Query.Labelers {
-			if !check(record.Event, record.Query) && !done {
-				record.labeler_condition = LABELER_REJECTED
-				
-				output <- record
-				done = true
+		} else {
+			for _, team := range record.Event.Teams {
+				if *team.Victory {
+					if !contains_all(team, record.Query.Winners) {
+						record.labeler_condition = LABELER_REJECTED
+						done = true
+					}
+				} else {
+					if !contains_all(team, record.Query.Losers) {
+						record.labeler_condition = LABELER_REJECTED
+						done = true
+					}
+				}
 			}
-		}
-		
-		if !done {
-			record.labeler_condition = LABELER_ACCEPTED		
+			if !done {
+				record.labeler_condition = LABELER_ACCEPTED		
+			}
 			output <- record
 		}
+	} // end infinite loop
+}
+
+// Determines whether all champions in WINNERS are on the team TEAM.
+// Returns boolean value.
+//
+// Assumes that there can only be one of each champion on a team in 
+// order to improve runtime.
+func contains_all(team *proto.Team, winners []proto.ChampionType) bool {
+	champ_count := 0
+	for _, player := range team.Players {
+		for _, champ := range winners {
+			if *player.Champion == champ {
+				champ_count += 1
+			}
+		}
 	}
+	
+	return champ_count == len(winners)
 }

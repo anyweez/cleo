@@ -5,5 +5,10 @@
 # Each line represents a single constraint that is put on the search. Each
 # term is prefixed by the team that it applies to, and filters can be applied
 # to teams, champions, properties of champions, and so on.
-ally:outcome(victory)
-ally:champion(thresh)
+
+SELECT
+	COUNT(game)
+FROM gamelogs/2014-05-04:02.17.gamelog 
+WHERE
+	winner.champions CONTAINS thresh AS w_thresh AND
+	w_thresh.items CONTAINS bloodthirster;

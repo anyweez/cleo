@@ -1,62 +1,25 @@
 package query
 
-import "gamelog"
+//import "adapter_league" adapter
+import "proto"
+import "fmt"
 
-type FilterFunction func(*gamelog.GameRecord, *Query) bool
-
-type Query struct {
-	FilterText [2]string		// A bunch of strings that need to be present in order to keep a record
-	LabelText [2]string
-	Filters [1]FilterFunction
-	Labelers [1]FilterFunction
+type QueryManager struct {
+		// Connection information.
 }
 
-func ReadFile(filename string) *Query {
-	query := new(Query)
-	query.FilterText[0] = "thresh"
-	query.LabelText[0] = "thresh"
+func (q *QueryManager) Connect() {
 	
-	// Check that everyone in Filters exists
-	// query.Checks[0]
-	query.Filters[0] = func(record *gamelog.GameRecord, query *Query) bool {
-		// Check each team.
-		for _, team := range record.Teams {
-			// Check each player on each team.
-			for _, player := range team.Players {
-				// Check to see if the target champion exists there.
-				for _, target := range query.FilterText {
-					// If yes, return true.
-					if target == *(player.Champion) {
-						return true
-					}
-				}
-			}
-		}
-		
-		return false
-	}
-	
-	query.Labelers[0] = func(record *gamelog.GameRecord, query *Query) bool {
-		// Check each team.
-		for _, team := range record.Teams {
-			// Check each player on each team.
-			for _, player := range team.Players {
-				// Check to see if the target champion exists there.
-				for _, target := range query.FilterText {
-					// If yes, return true.
-					if target == *(player.Champion) {
-						return *team.Victory
-					}
-				}
-			}
-		}
-		
-		return false
-	}
+}
+
+func (q *QueryManager) Await() proto.GameQuery {
+	query := proto.GameQuery{}
+	query.Winners = append(query.Winners, proto.ChampionType_THRESH)
 	
 	return query
 }
 
-func prepare(raw_query string) {
-	
+func (q *QueryManager) Respond(qr *proto.GameQueryResponse) {
+	fmt.Println("Events examined:", qr.Total)
+	fmt.Println(fmt.Sprintf("Matches: %d / %d", qr.Matching, qr.Available))
 }
