@@ -1,1 +1,4 @@
+mkdir -p src/proto
+mkdir -p lib/
+mkdir -p bin/
 protoc --python_out=lib/ --plugin=bin/protoc-gen-go --go_out=src/proto *.proto

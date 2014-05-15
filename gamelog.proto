@@ -1,8 +1,18 @@
 package proto;
 
-enum ChampionType {
-	THRESH		= 0;
-	CAITLYN		= 1;
+import "champions.proto";
+
+// ChampionGameList's are imported into lolstat for searching. These
+// are optimized for determining overlap between multiple champions' 
+// game lists.
+message ChampionGameList {
+	message ChampionList {
+		optional ChampionType champion 	= 1;
+		repeated uint32 winning			= 2;
+		repeated uint32 losing			= 3;
+	}
+	
+	repeated ChampionList champions = 1;
 }
 
 message GameLog {

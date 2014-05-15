@@ -1,6 +1,6 @@
 package proto;
 
-import "gamelog.proto";
+import "champions.proto";
 
 // A query that identifies two teams and the outcome state.
 //
@@ -11,7 +11,7 @@ message GameQuery {
 	repeated ChampionType losers = 2;
 }
 
-message GameQueryResponse {
+message QueryResponse {
 	// The total number of events reviewed.
 	optional uint32 total = 1;
 	

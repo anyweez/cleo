@@ -1,0 +1,7 @@
+package proto;
+
+// Enumerates all avaialble champions and gives them a unique ID.
+enum ChampionType {
+	THRESH		= 0;
+	CAITLYN		= 1;
+}
