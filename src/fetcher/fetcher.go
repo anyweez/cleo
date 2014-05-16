@@ -19,6 +19,12 @@ import "io"
 const API_KEY = "abebd3e9-00f2-4ba6-997d-0008c2072373"
 const NUM_RETRIEVERS = 30
 
+type RecordContainer struct {
+	GameData			[]byte
+	GameId				uint64
+	Timestamp			uint64
+}
+
 type JSONResponse struct {
 	Games 				[]JSONGameResponse `json:"games"`
 	SummonerId 			uint64
@@ -115,7 +121,7 @@ func main() {
 	retrieval_inputs := make(chan *gamelog.Player, 100)
 
 	// Connect to MongoDB instance.
-	session, _ := mgo.Dial("127.0.0.1:8080")
+	session, _ := mgo.Dial("127.0.0.1:27017")
 	games_collection := session.DB("lolstat").C("games")
 //	player_collection := session.DB("lolstat").C("players")
 	defer session.Close()
@@ -174,7 +180,9 @@ func retriever(input chan *gamelog.Player, collection *mgo.Collection) {
 			
 			// Write all games into permanent storage.
 			for _, game := range convert(&json_response) {
-				collection.Insert(&game)
+				encoded_gamedata, _ := gproto.Marshal(&game)
+				record := RecordContainer{ encoded_gamedata, *game.GameId, *game.Timestamp }
+				collection.Insert(record)
 			}
 		}
 	}
