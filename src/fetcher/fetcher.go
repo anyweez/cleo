@@ -2,7 +2,6 @@ package main
 
 import gproto "code.google.com/p/goprotobuf/proto"
 import "labix.org/v2/mgo"
-import "labix.org/v2/mgo/bson"
 import gamelog "proto"
 // import "net/http/pprof"
 import "runtime/pprof"
@@ -22,7 +21,7 @@ import "io"
 // Constants
 const API_KEY = "abebd3e9-00f2-4ba6-997d-0008c2072373"
 const NUM_RETRIEVERS = 30
-const STORE_RESPONSES = false
+const STORE_RESPONSES = true
 
 // Flags
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
@@ -230,12 +229,13 @@ func retriever(input chan uint64, collection *mgo.Collection, cm *CandidateManag
 				record := RecordContainer{ encoded_gamedata, *game.GameId, *game.Timestamp }
 
 				if STORE_RESPONSES {
-					// Check to see if the game already exists. If so, don't do anything.
-					record_count, _ := collection.Find( bson.M{ "gameid": *game.GameId} ).Count()
-					
-					if record_count == 0 {
-						collection.Insert(record)
-					}
+					collection.Insert(record)
+//					// Check to see if the game already exists. If so, don't do anything.
+//					record_count, _ := collection.Find( bson.M{ "gameid": *game.GameId} ).Count()
+
+//					if record_count == 0 {
+//						collection.Insert(record)
+//					}
 				}
 			} // end for
 		}
