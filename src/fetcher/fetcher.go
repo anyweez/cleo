@@ -22,10 +22,11 @@ import "io"
 // Constants
 const API_KEY = "abebd3e9-00f2-4ba6-997d-0008c2072373"
 const NUM_RETRIEVERS = 30
-
+const STORE_RESPONSES = false
 
 // Flags
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+var memprofile = flag.String("memprofile", "", "write memory profile to this file")
 
 // Data structures
 type RecordContainer struct {
@@ -69,23 +70,23 @@ type JSONPlayerResponse struct {
 //// and ensures that they're all unique in the queue.
 //////////////////////////////////////////////////////////////////
 type CandidateManager struct {
-	Queue				chan *gamelog.Player
+	Queue					chan uint64
 	CandidateMap			map[uint64]bool
 	
-	count				uint32
+	count					uint32
 }
 
-func (cm *CandidateManager) Add(player *gamelog.Player) {
-	_, exists := cm.CandidateMap[*player.SummonerId]
+func (cm *CandidateManager) Add(player uint64) {
+	_, exists := cm.CandidateMap[player]
 	if !exists {
-		cm.CandidateMap[*player.SummonerId] = true
+		cm.CandidateMap[player] = true
 		cm.count += 1
 		
 		cm.Queue <- player
 	}
 }
 
-func (cm *CandidateManager) Next() *gamelog.Player {
+func (cm *CandidateManager) Next() uint64 {
 	player := <- cm.Queue
 	// Cycle the candidate back into the queue.
 	cm.Queue <- player
@@ -122,7 +123,9 @@ func read_summoner_ids(filename string) []uint64 {
 
 func main() {
 	// Flag setup
+	flag.Parse()
 	if *cpuprofile != "" {
+		fmt.Println("Starting CPU profiling...")
 		f, err := os.Create(*cpuprofile)
 		if err != nil {
 			log.Fatal(err)
@@ -134,15 +137,14 @@ func main() {
 	fmt.Println("Initializing...")
 	
 	cm := CandidateManager{}
-	cm.Queue = make(chan *gamelog.Player, 1000000)
+	cm.Queue = make(chan uint64, 1000000)
 	cm.CandidateMap = make(map[uint64]bool)
 		
-	retrieval_inputs := make(chan *gamelog.Player, 100)
+	retrieval_inputs := make(chan uint64, 100)
 
 	// Connect to MongoDB instance.
 	session, _ := mgo.Dial("127.0.0.1:27017")
 	games_collection := session.DB("lolstat").C("games")
-//	player_collection := session.DB("lolstat").C("players")
 	defer session.Close()
 	
 	// Kick off some retrievers that will pull from the retrieval queue.
@@ -153,10 +155,7 @@ func main() {
 	// Load in a file full of summoner ID's.
 	summoner_ids := read_summoner_ids("champions")
 	for _, sid := range summoner_ids {
-		player := gamelog.Player{}
-		player.SummonerId = gproto.Uint64(sid)
-
-		cm.Add(&player)
+		cm.Add(sid)
 	}
 	
 	fmt.Println(fmt.Sprintf("Loaded %d summoners...let's do this!", len(summoner_ids)))
@@ -175,6 +174,21 @@ func main() {
 
 		fmt.Print( fmt.Sprintf("Summoner queue size: %d [%.1f%% to next export]\r", cm.Count(), float32(counter) / 1000) )
 
+		if counter == 200 {
+			pprof.StopCPUProfile()
+			
+			if *memprofile != "" {
+				f, err := os.Create(*memprofile)
+				if err != nil {
+					log.Fatal(err)
+				}
+				pprof.WriteHeapProfile(f)
+				f.Close()
+			}
+			
+			fmt.Println("Profiling complete")
+		}
+
 		// Every thousand requests save the new summoner list.
 		if counter % 1000 == 0 {
 			write_candidates(&cm)
@@ -190,13 +204,13 @@ func main() {
 //
 // Note that all rate limiting is handled directly by the channel, meaning
 // that everything in this goroutine can execute as quickly as possible.
-func retriever(input chan *gamelog.Player, collection *mgo.Collection, cm *CandidateManager) {
+func retriever(input chan uint64, collection *mgo.Collection, cm *CandidateManager) {
 	url := "https://prod.api.pvp.net/api/lol/na/v1.3/game/by-summoner/%d/recent?api_key=%s"
 
 	for {
 		player := <- input
 
-		resp, err := http.Get(fmt.Sprintf(url, *player.SummonerId, API_KEY))
+		resp, err := http.Get(fmt.Sprintf(url, player, API_KEY))
 		if err != nil {
 			log.Println("Error retrieving data:", err)
 		} else {
@@ -214,12 +228,15 @@ func retriever(input chan *gamelog.Player, collection *mgo.Collection, cm *Candi
 				encoded_gamedata, _ := gproto.Marshal(&game)
 				record := RecordContainer{ encoded_gamedata, *game.GameId, *game.Timestamp }
 
-				// Check to see if the game already exists. If so, don't do anything.
-				record_count, _ := collection.Find( bson.M{ "gameid": *game.GameId} ).Count()
-				if record_count == 0 {
-					collection.Insert(record)
+				if STORE_RESPONSES {
+					// Check to see if the game already exists. If so, don't do anything.
+					record_count, _ := collection.Find( bson.M{ "gameid": *game.GameId} ).Count()
+					
+					if record_count == 0 {
+						collection.Insert(record)
+					}
 				}
-			}
+			} // end for
 		}
 	}
 }
