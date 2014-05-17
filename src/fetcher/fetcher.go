@@ -174,7 +174,8 @@ func main() {
 
 		fmt.Print( fmt.Sprintf("Summoner queue size: %d [%.1f%% to next export]\r", cm.Count(), float32(counter) / 1000) )
 
-		if counter == 200 {
+		// Run for approx 2 hrs then dump data.
+		if counter == 6000 && (*cpuprofile != "" || *memprofile != "") {
 			pprof.StopCPUProfile()
 			
 			if *memprofile != "" {
