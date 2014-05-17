@@ -2,11 +2,14 @@ package main
 
 import gproto "code.google.com/p/goprotobuf/proto"
 import "labix.org/v2/mgo"
+import "labix.org/v2/mgo/bson"
 import gamelog "proto"
-
+// import "net/http/pprof"
+import "runtime/pprof"
 import "encoding/json"
 import "net/http"
 import "fmt"
+import "flag"
 import "time"
 import "io/ioutil"
 import "log"
@@ -16,9 +19,15 @@ import "bufio"
 import "strconv"
 import "io"
 
+// Constants
 const API_KEY = "abebd3e9-00f2-4ba6-997d-0008c2072373"
 const NUM_RETRIEVERS = 30
 
+
+// Flags
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+
+// Data structures
 type RecordContainer struct {
 	GameData			[]byte
 	GameId				uint64
@@ -31,7 +40,7 @@ type JSONResponse struct {
 }
 
 type JSONGameResponse struct {
-	FellowPlayers		[]JSONPlayerResponse
+	FellowPlayers			[]JSONPlayerResponse
 	Stats				JSONGameStatsResponse
 	
 	GameId 				uint64
@@ -46,7 +55,7 @@ type JSONGameResponse struct {
 }
 
 type JSONGameStatsResponse struct {
-	Win					bool
+	Win				bool
 }
 
 type JSONPlayerResponse struct {
@@ -61,7 +70,7 @@ type JSONPlayerResponse struct {
 //////////////////////////////////////////////////////////////////
 type CandidateManager struct {
 	Queue				chan *gamelog.Player
-	CandidateMap		map[uint64]bool
+	CandidateMap			map[uint64]bool
 	
 	count				uint32
 }
@@ -112,6 +121,16 @@ func read_summoner_ids(filename string) []uint64 {
 }
 
 func main() {
+	// Flag setup
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+
 	fmt.Println("Initializing...")
 	
 	cm := CandidateManager{}
@@ -128,7 +147,7 @@ func main() {
 	
 	// Kick off some retrievers that will pull from the retrieval queue.
 	for i := 0; i < NUM_RETRIEVERS; i++ {
-		go retriever(retrieval_inputs, games_collection)
+		go retriever(retrieval_inputs, games_collection, &cm)
 	}
 
 	// Load in a file full of summoner ID's.
@@ -141,6 +160,8 @@ func main() {
 	}
 	
 	fmt.Println(fmt.Sprintf("Loaded %d summoners...let's do this!", len(summoner_ids)))
+
+	counter := 0
 	// Forever: pull an summoner ID from user_queue, toss it in retrieval_inputs
 	// and add it back to user_queue.
 	for {
@@ -150,7 +171,14 @@ func main() {
 
 		// Push the player to the retrieval queue.
 		retrieval_inputs <- cm.Next()
-		fmt.Print( fmt.Sprintf("Summoner queue size: %d\r", cm.Count()) )
+		counter += 1
+
+		fmt.Print( fmt.Sprintf("Summoner queue size: %d [%.1f%% to next export]\r", cm.Count(), float32(counter) / 1000) )
+
+		// Every thousand requests save the new summoner list.
+		if counter % 1000 == 0 {
+			write_candidates(&cm)
+		}
 	}
 }
 
@@ -162,7 +190,7 @@ func main() {
 //
 // Note that all rate limiting is handled directly by the channel, meaning
 // that everything in this goroutine can execute as quickly as possible.
-func retriever(input chan *gamelog.Player, collection *mgo.Collection) {
+func retriever(input chan *gamelog.Player, collection *mgo.Collection, cm *CandidateManager) {
 	url := "https://prod.api.pvp.net/api/lol/na/v1.3/game/by-summoner/%d/recent?api_key=%s"
 
 	for {
@@ -180,9 +208,17 @@ func retriever(input chan *gamelog.Player, collection *mgo.Collection) {
 			
 			// Write all games into permanent storage.
 			for _, game := range convert(&json_response) {
+				// Add all of the players to the candidate manager.
+
+				// Encode and store in the database.
 				encoded_gamedata, _ := gproto.Marshal(&game)
 				record := RecordContainer{ encoded_gamedata, *game.GameId, *game.Timestamp }
-				collection.Insert(record)
+
+				// Check to see if the game already exists. If so, don't do anything.
+				record_count, _ := collection.Find( bson.M{ "gameid": *game.GameId} ).Count()
+				if record_count == 0 {
+					collection.Insert(record)
+				}
 			}
 		}
 	}
@@ -249,9 +285,6 @@ func convert(response *JSONResponse) []gamelog.GameRecord {
 			} else {
 				log.Println("Unknown team ID found on game", game.GameId)
 			}
-				
-			// Add the new players to the CandidateManager.
-//			cm.Add(&plyr)
 		}	
 		games = append(games, record)	
 	}
