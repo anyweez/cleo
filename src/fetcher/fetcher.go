@@ -125,11 +125,11 @@ func main() {
 	flag.Parse()
 	if *cpuprofile != "" {
 		fmt.Println("Starting CPU profiling...")
-		f, err := os.Create(*cpuprofile)
+		cf, err := os.Create(*cpuprofile)
 		if err != nil {
 			log.Fatal(err)
 		}
-		pprof.StartCPUProfile(f)
+		pprof.StartCPUProfile(cf)
 		defer pprof.StopCPUProfile()
 	}
 
@@ -174,16 +174,16 @@ func main() {
 		fmt.Print( fmt.Sprintf("Summoner queue size: %d [%.1f%% to next export]\r", cm.Count(), float32(counter) / 1000) )
 
 		// Run for approx 2 hrs then dump data.
-		if counter == 6000 && (*cpuprofile != "" || *memprofile != "") {
+		if counter == 1000 && (*cpuprofile != "" || *memprofile != "") {
 			pprof.StopCPUProfile()
 			
 			if *memprofile != "" {
-				f, err := os.Create(*memprofile)
+				mf, err := os.Create(*memprofile)
 				if err != nil {
 					log.Fatal(err)
 				}
-				pprof.WriteHeapProfile(f)
-				f.Close()
+				pprof.WriteHeapProfile(mf)
+				mf.Close()
 			}
 			
 			fmt.Println("Profiling complete")
