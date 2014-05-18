@@ -2,11 +2,16 @@ package main
 
 import "fmt"
 import "query"
+import "time"
+import "proto"
+//import "sort"
 import gproto "code.google.com/p/goprotobuf/proto"
 
+// PCGL format: array[champion_id] = [game_ids]
 type PackedChampionGameList struct {
 	Winning		[][]uint32
 	Losing		[][]uint32
+	All			[]uint32
 }
 	
 // Reads in a ChampionGameList file that can be used for searching.
@@ -20,19 +25,9 @@ func read_cgl(filename string) PackedChampionGameList {
 }
 
 func main() {
-	t := make([]uint32, 5, 10)
-	u := make([]uint32, 3, 10)
-	
-	t[0], t[1], t[2], t[3], t[4] = 1, 2, 3, 4, 5
-	u[0], u[1], u[2] = 2, 4, 5
-	
-	fmt.Println("Before:", t)
-	overlap(&t, u)
-	fmt.Println("After:", t)
-	
-	return
-
+	// Inputs
 	query_requests := make(chan query.GameQueryRequest, 100)
+	// Outputs
 	query_completions := make(chan query.GameQueryResponse, 100)
 
 	fmt.Printf("Loading gamelog.\n")
@@ -53,62 +48,48 @@ func main() {
 	// will only handle one at a time but should be trivial to parallelize
 	// once the time is right.
 	for {
-		query_requests <- qm.Await()
+		gqr := query.GameQueryRequest{}
+		gqr.Query = &proto.GameQuery{}
+		gqr.Id = 1
+		fmt.Println(gqr.Query)
+		gqr.Query.Winners = append(gqr.Query.Winners, proto.ChampionType_THRESH)
+
+		query_requests <- gqr
+//		qm.Await()
+//		query_requests <- qm.Await()
+		time.Sleep(10 * time.Second)
 	}
 }
 
 func query_handler(input chan query.GameQueryRequest, cgl *PackedChampionGameList, output chan query.GameQueryResponse) {
 	for {
 		request := <-input
+		fmt.Println("Handling query #", request.Id)
 		
 		// Eligible gamelist contains all games that match, irrespective of team.
-		eligible_gamelist := make([]uint32, 0, 100)
-		eligible_added := false
+		eligible_gamelist := cgl.All
 		
 		// Matching gamelist contains all games that match, respective of team.
-		matching_gamelist := make([]uint32, 0, 100)
-		matching_added := false
-		
+		matching_gamelist := cgl.All
+
+//		fmt.Println("breakpoint")
+		//// Step #1: Matching set (incl. team) ////
 		// Merge all game ID's, first matching the winning parameters. 
 		for _, champion_id := range request.Query.Winners {
-			// Update the matching gamelist.
-			if matching_added {
-				overlap(&matching_gamelist, cgl.Winning[champion_id])
-			} else {
-				matching_gamelist = append(matching_gamelist, cgl.Winning[champion_id]...)
-				matching_added = true
-			}
-			
-			// Update the eligible gamelist.
-			if eligible_added {
-				overlap(&eligible_gamelist, cgl.Losing[champion_id])
-			} else {
-				eligible_gamelist = append(eligible_gamelist, cgl.Losing[champion_id]...)
-				eligible_added = true
-			}
+			// Update the matching gamelist to include just the overlap between these two lists.
+			overlap(&matching_gamelist, cgl.Winning[champion_id])
+			overlap(&eligible_gamelist, cgl.Losing[champion_id])
 		}
 		
-		eligible_added = false
-		matching_added = false
-		
-		// Merge all game ID's, now matching the losing parameters.
+		// Then match all losers.
 		for _, champion_id := range request.Query.Losers {
-			if matching_added {
-				overlap(&matching_gamelist, cgl.Losing[champion_id])
-			} else {
-				matching_gamelist = append(matching_gamelist, cgl.Losing[champion_id]...)
-				matching_added = true
-			}
-			
-			if eligible_added {
-				overlap(&eligible_gamelist, cgl.Winning[champion_id])
-			} else {
-				eligible_gamelist = append(eligible_gamelist, cgl.Winning[champion_id]...)
-				eligible_added = true
-			}
+			overlap(&matching_gamelist, cgl.Losing[champion_id])
+			overlap(&eligible_gamelist, cgl.Winning[champion_id])
 		}
 		
+		//// Step #2: Eligible set (not incl. team) ////
 		eligible_gamelist = append(eligible_gamelist, matching_gamelist...)
+//		sort.Sort(eligible_gamelist)
 		
 		// Prepare the response.
 		response := query.GameQueryResponse{}
@@ -133,32 +114,38 @@ func query_responder(input chan query.GameQueryResponse) {
 	}
 }
 
+// Overlaps accepsts two lists of uints and reduces FIRST to the overlap
+// between both lists. 
+// Assumes that both lists are ordered.
 func overlap(first *[]uint32, second []uint32) {
+	// parallel_counter indexes into SECOND and may move at a different
+	// rate than i.
 	parallel_counter := 0
 	
 	for i := 0; i < len(*first); i++ {
-		// Loop through until the second array's value i greater than or
-		// equal to the primary array. We do not need to reset this counter
+		fmt.Println("i=", i, ", parallel_counter=", parallel_counter)
+		// Loop through until the second array's value is greater than or
+		// equal to the primary array. We should not reset this counter
 		// variable.
 		for second[parallel_counter] < (*first)[i] {
-			if parallel_counter + 1 <= len(second) {
+			if parallel_counter + 1 < len(second) {
 				parallel_counter += 1
-			}
-			
-			fmt.Println("Incrementing counter to", parallel_counter)
+			} else {
+			// If parallel_counter is as big as it can get then none of
+			// the other numbers in FIRST can overlap.
+				(*first) = (*first)[:i]
+				return
+			}			
 		}
 		// Once the secondary index catches up, if it's beyond the primary
 		// then the primary doesn't exist. If they're equivalent then we
 		// keep the primary value.
-		if second[parallel_counter] > (*first)[i] {
+		if second[parallel_counter] > (*first)[i] {			
 			(*first)[i] = 0
+			(*first) = append( (*first)[:i], (*first)[i+1:]... )
 			
-			fmt.Println("Value doesn't exist. Clearing.")
-		}
-
-		// Increment if we're not a tthe end.
-		if parallel_counter + 1 <= len(second) {
-			parallel_counter += 1
+			fmt.Println(*first)
+			i -= 1
 		}
 	}
 }
