@@ -32,8 +32,9 @@ func (q *QueryManager) Connect() {
 
 func (q *QueryManager) Await() GameQueryRequest {
 	gqr := GameQueryRequest{}
-	gqr.Id = q.NextQueryId + 1
-	// List of all winners.
+	gqr.Id = q.NextQueryId
+	
+	// Find out how often Thresh is on the winning team.
 	gqr.Query.Winners = append(gqr.Query.Winners, proto.ChampionType_THRESH)
 	
 	// Increment the query counter.

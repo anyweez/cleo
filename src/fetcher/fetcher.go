@@ -121,6 +121,14 @@ func read_summoner_ids(filename string) []uint64 {
 	return lines
 }
 
+func load_starting_ids(cm *CandidateManager) {
+	// Load in a file full of summoner ID's.
+	summoner_ids := read_summoner_ids("champions")
+	for _, sid := range summoner_ids {
+		cm.Add(sid)
+	}		
+}
+
 func main() {
 	// Flag setup
 	flag.Parse()
@@ -152,13 +160,8 @@ func main() {
 		go retriever(retrieval_inputs, games_collection, &cm)
 	}
 
-	// Load in a file full of summoner ID's.
-	summoner_ids := read_summoner_ids("champions")
-	for _, sid := range summoner_ids {
-		cm.Add(sid)
-	}
-	
-	fmt.Println(fmt.Sprintf("Loaded %d summoners...let's do this!", len(summoner_ids)))
+	load_starting_ids(&cm)
+	fmt.Println( fmt.Sprintf("Loaded %d summoners...let's do this!", cm.Count()) )
 
 	counter := 0
 	// Forever: pull an summoner ID from user_queue, toss it in retrieval_inputs
