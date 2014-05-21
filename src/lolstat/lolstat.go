@@ -7,21 +7,32 @@ import "proto"
 //import "sort"
 import gproto "code.google.com/p/goprotobuf/proto"
 
-// PCGL format: array[champion_id] = [game_ids]
-type PackedChampionGameList struct {
-	Winning		[][]uint32
-	Losing		[][]uint32
+type LivePCGL struct {
+	Champions	map[proto.ChampionType]LivePCGLRecord
 	All			[]uint32
 }
-	
+
+type LivePCGLRecord struct {
+	Winning 	[]uint32
+	Losing		[]uint32
+}
+
 // Reads in a ChampionGameList file that can be used for searching.
-// TODO: Retrieve the file and restructure.
-func read_cgl(filename string) PackedChampionGameList {
-	cgl := PackedChampionGameList{}
+// TODO: Retrieve the file.
+func read_cgl(filename string) LivePCGL {
+	pcgl := proto.PackedChampionGameList{}
+	live_pcgl := LivePCGL{}
+
+//	gproto.Unmarshal(bytes, &cgl)	
+	live_pcgl.All = pcgl.All
+
+	for _, record := range pcgl.Champions {
+		live_pcgl.Champions[*record.Champion] = LivePCGLRecord{record.Winning , record.Losing}
+//		live_pcgl.Champions[*record.Champion].Winning = *record.Winning
+//		live_pcgl.Champions[*record.Champion].Losing = *record.Losing
+	}
 	
-	// Read through and initialize to length of num_champions
-	// Each subarray has a specific length depending on the number of games.
-	return cgl
+	return live_pcgl
 }
 
 func main() {
@@ -61,35 +72,57 @@ func main() {
 	}
 }
 
-func query_handler(input chan query.GameQueryRequest, cgl *PackedChampionGameList, output chan query.GameQueryResponse) {
+// A query handler filters down the list of game ID's to the set identified in
+// the provided query. They are run as goroutines and can handle a single
+// query at a time. They each make a copy of the lists in the CGl so that
+// all queries are independent and unaffected by others.
+//
+// Two values need to be computed: the MATCHING games and the ELIGIBLE games.
+//   - Matching games are those that have all of the requested players
+//     on the requested teams (numerator).
+//   - Eligible games are those that have all of the requested players
+//     on one team or another (denominator).
+//
+// The general algorithm for computing each is as follows:
+//
+// MATCHING
+// Start with a list of all games. For each winning champion, find the
+// overlap between the full set with the winning game set for that champion.
+// Then do the same thing for all losing champions.
+//
+// ELIGIBLE
+// Start with a list of all games. For each winning champion, find the
+// overlap between the full set and the losing game set for that champion.
+// Then do the same thing for all losing champions (find the winning set
+// for them). Then merge the output from the MATCHING set with the lists
+// from the ELIGIBLE set to produce the final ELIGIBLE set.  
+func query_handler(input chan query.GameQueryRequest, pcgl *LivePCGL, output chan query.GameQueryResponse) {
 	for {
 		request := <-input
 		fmt.Println("Handling query #", request.Id)
 		
 		// Eligible gamelist contains all games that match, irrespective of team.
-		eligible_gamelist := cgl.All
+		eligible_gamelist := pcgl.All
 		
 		// Matching gamelist contains all games that match, respective of team.
-		matching_gamelist := cgl.All
+		matching_gamelist := pcgl.All
 
-//		fmt.Println("breakpoint")
-		//// Step #1: Matching set (incl. team) ////
 		// Merge all game ID's, first matching the winning parameters. 
-		for _, champion_id := range request.Query.Winners {
+		for _, champion := range request.Query.Winners {
 			// Update the matching gamelist to include just the overlap between these two lists.
-			overlap(&matching_gamelist, cgl.Winning[champion_id])
-			overlap(&eligible_gamelist, cgl.Losing[champion_id])
+			overlap(&matching_gamelist, pcgl.Champions[champion].Winning)
+			overlap(&eligible_gamelist, pcgl.Champions[champion].Losing)
 		}
 		
 		// Then match all losers.
-		for _, champion_id := range request.Query.Losers {
-			overlap(&matching_gamelist, cgl.Losing[champion_id])
-			overlap(&eligible_gamelist, cgl.Winning[champion_id])
+		for _, champion := range request.Query.Losers {
+			overlap(&matching_gamelist, pcgl.Champions[champion].Losing)
+			overlap(&eligible_gamelist, pcgl.Champions[champion].Winning)
 		}
 		
 		//// Step #2: Eligible set (not incl. team) ////
-		eligible_gamelist = append(eligible_gamelist, matching_gamelist...)
-//		sort.Sort(eligible_gamelist)
+		eligible_gamelist = merge(eligible_gamelist, matching_gamelist)
+		//eligible_gamelist = append(eligible_gamelist, matching_gamelist...)
 		
 		// Prepare the response.
 		response := query.GameQueryResponse{}
@@ -98,7 +131,7 @@ func query_handler(input chan query.GameQueryRequest, cgl *PackedChampionGameLis
 		
 		response.Response.Available = gproto.Uint32( uint32(len(eligible_gamelist)) )
 		response.Response.Matching = gproto.Uint32( uint32(len(matching_gamelist)) )
-		response.Response.Total = gproto.Uint32(0)
+		response.Response.Total = gproto.Uint32( uint32(len(pcgl.All)) )
 		
 		output <- response
 	}
@@ -114,7 +147,7 @@ func query_responder(input chan query.GameQueryResponse) {
 	}
 }
 
-// Overlaps accepsts two lists of uints and reduces FIRST to the overlap
+// Overlap accepts two lists of uints and reduces FIRST to the overlap
 // between both lists. 
 // Assumes that both lists are ordered.
 func overlap(first *[]uint32, second []uint32) {
@@ -123,7 +156,6 @@ func overlap(first *[]uint32, second []uint32) {
 	parallel_counter := 0
 	
 	for i := 0; i < len(*first); i++ {
-		fmt.Println("i=", i, ", parallel_counter=", parallel_counter)
 		// Loop through until the second array's value is greater than or
 		// equal to the primary array. We should not reset this counter
 		// variable.
@@ -148,4 +180,46 @@ func overlap(first *[]uint32, second []uint32) {
 			i -= 1
 		}
 	}
+}
+
+func merge(first []uint32, second []uint32) []uint32 {
+	full := make([]uint32, 0, len(first) + len(second))
+	
+	first_i := 0
+	second_i := 0
+	
+	// Move through the list until we get to the end of one of them.
+	for first_i < len(first) && second_i < len(second) {
+		fmt.Println(fmt.Sprintf("first=%d, second=%d", first_i, second_i))
+		// If next value in FIRST is less than next value in SECOND,
+		// copy value from FIRST and move on.
+		if first[first_i] < second[second_i] {
+			full = append(full, first[first_i])
+			
+			first_i += 1
+		// If the two values are the same, copy one of them over. This
+		// will remove duplicates. 
+		} else if first[first_i] == second[second_i] {
+			full = append(full, first[first_i])
+			
+			first_i += 1
+			second_i += 1
+		// Otherwise if FIRST > SECOND, copy over second.
+		} else {
+			full = append(full, second[second_i])
+			
+			second_i += 1
+		}
+	}
+	
+	// Copy over all remaining values from FIRST and SECOND.
+	if first_i < len(first) {
+		full = append(full, first[first_i:]...)
+	}
+	
+	if second_i < len(second) {
+		full = append(full, second[second_i:]...)
+	}
+	
+	return full
 }

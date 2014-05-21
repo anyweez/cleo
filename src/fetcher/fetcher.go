@@ -19,6 +19,8 @@ import "bufio"
 import "strconv"
 import "io"
 
+import "libcleo"
+
 // Constants
 const API_KEY = "abebd3e9-00f2-4ba6-997d-0008c2072373"
 const NUM_RETRIEVERS = 30
@@ -295,7 +297,7 @@ func convert(response *JSONResponse) []gamelog.GameRecord {
 			pstats := gamelog.PlayerStats{}
 
 			plyr.SummonerId = gproto.Uint64(player.SummonerId)
-			pstats.ChampionId = gproto.Uint32(player.ChampionId)
+			pstats.Champion = libcleo.Rid2Cleo(player.ChampionId).Enum()
 				
 			if player.TeamId == 100 {
 				pstats.Player = &plyr
