@@ -32,7 +32,7 @@ var memprofile = flag.String("memprofile", "", "write memory profile to this fil
 
 type JSONResponse struct {
 	Games      []JSONGameResponse `json:"games"`
-	SummonerId uint64
+	SummonerId uint32
 }
 
 type JSONGameResponse struct {
@@ -55,7 +55,7 @@ type JSONGameStatsResponse struct {
 }
 
 type JSONPlayerResponse struct {
-	SummonerId uint64
+	SummonerId uint32
 	TeamId     uint32
 	ChampionId uint32
 }
@@ -65,13 +65,13 @@ type JSONPlayerResponse struct {
 //// and ensures that they're all unique in the queue.
 //////////////////////////////////////////////////////////////////
 type CandidateManager struct {
-	Queue        chan uint64
-	CandidateMap map[uint64]bool
+	Queue        chan uint32
+	CandidateMap map[uint32]bool
 
 	count uint32
 }
 
-func (cm *CandidateManager) Add(player uint64) {
+func (cm *CandidateManager) Add(player uint32) {
 	_, exists := cm.CandidateMap[player]
 	if !exists {
 		cm.CandidateMap[player] = true
@@ -81,7 +81,7 @@ func (cm *CandidateManager) Add(player uint64) {
 	}
 }
 
-func (cm *CandidateManager) Next() uint64 {
+func (cm *CandidateManager) Next() uint32 {
 	player := <-cm.Queue
 	// Cycle the candidate back into the queue.
 	cm.Queue <- player
@@ -96,7 +96,7 @@ func (cm *CandidateManager) Count() uint32 {
 // This function reads in a list of champions from a local file to start
 // as the seeding set. The fetcher will automatically include new champions
 // it discovers on its journey as well.
-func read_summoner_ids(filename string) []uint64 {
+func read_summoner_ids(filename string) []uint32 {
 	// Read the specified file.
 	file, err := os.Open(filename)
 	if err != nil {
@@ -104,12 +104,12 @@ func read_summoner_ids(filename string) []uint64 {
 	}
 	defer file.Close()
 
-	lines := make([]uint64, 0, 10000)
+	lines := make([]uint32, 0, 10000)
 	scanner := bufio.NewScanner(file)
 
 	for scanner.Scan() {
-		value, _ := strconv.ParseUint(scanner.Text(), 10, 64)
-		lines = append(lines, value)
+		value, _ := strconv.ParseUint(scanner.Text(), 10, 32)
+		lines = append(lines, uint32(value))
 	}
 
 	// Return a GameLog
@@ -140,10 +140,10 @@ func main() {
 	fmt.Println("Initializing...")
 
 	cm := CandidateManager{}
-	cm.Queue = make(chan uint64, 1000000)
-	cm.CandidateMap = make(map[uint64]bool)
+	cm.Queue = make(chan uint32, 1000000)
+	cm.CandidateMap = make(map[uint32]bool)
 
-	retrieval_inputs := make(chan uint64, 100)
+	retrieval_inputs := make(chan uint32, 100)
 
 	// Connect to MongoDB instance.
 	session, _ := mgo.Dial("127.0.0.1:27017")
@@ -202,7 +202,7 @@ func main() {
 //
 // Note that all rate limiting is handled directly by the channel, meaning
 // that everything in this goroutine can execute as quickly as possible.
-func retriever(input chan uint64, collection *mgo.Collection, cm *CandidateManager) {
+func retriever(input chan uint32, collection *mgo.Collection, cm *CandidateManager) {
 	url := "https://prod.api.pvp.net/api/lol/na/v1.3/game/by-summoner/%d/recent?api_key=%s"
 
 	for {
@@ -263,7 +263,7 @@ func convert(response *JSONResponse) []gamelog.GameRecord {
 
 		// Add the target player and set the outcome.
 		plyr := gamelog.Player{}
-		plyr.SummonerId = gproto.Uint64(response.SummonerId)
+		plyr.SummonerId = gproto.Uint32(response.SummonerId)
 
 		pstats := gamelog.PlayerStats{}
 		pstats.Champion = libcleo.Rid2Cleo(game.ChampionId).Enum()
@@ -288,7 +288,7 @@ func convert(response *JSONResponse) []gamelog.GameRecord {
 			plyr := gamelog.Player{}
 			pstats := gamelog.PlayerStats{}
 
-			plyr.SummonerId = gproto.Uint64(player.SummonerId)
+			plyr.SummonerId = gproto.Uint32(player.SummonerId)
 			pstats.Champion = libcleo.Rid2Cleo(player.ChampionId).Enum()
 
 			if player.TeamId == 100 {
@@ -316,6 +316,6 @@ func write_candidates(cm *CandidateManager) {
 	defer f.Close()
 
 	for k, _ := range cm.CandidateMap {
-		io.WriteString(f, strconv.FormatUint(k, 10)+"\n")
+		io.WriteString(f, strconv.FormatUint(uint64(k), 10) + "\n")
 	}
 }
