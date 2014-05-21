@@ -137,6 +137,10 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
+	if *API_KEY == "" {
+		log.Fatal("You must provide an API key using the -apikey flag.")
+	}
+
 	fmt.Println("Initializing...")
 
 	cm := CandidateManager{}
@@ -208,7 +212,7 @@ func retriever(input chan uint32, collection *mgo.Collection, cm *CandidateManag
 	for {
 		player := <-input
 
-		resp, err := http.Get(fmt.Sprintf(url, player, API_KEY))
+		resp, err := http.Get(fmt.Sprintf(url, player, *API_KEY))
 		if err != nil {
 			log.Println("Error retrieving data:", err)
 		} else {
