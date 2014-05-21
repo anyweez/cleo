@@ -112,7 +112,7 @@ func read_summoner_ids(filename string) []uint32 {
 		lines = append(lines, uint32(value))
 	}
 
-	// Return a GameLog
+	// Return a set of summoner ID's.
 	return lines
 }
 
@@ -144,6 +144,8 @@ func main() {
 	fmt.Println("Initializing...")
 
 	cm := CandidateManager{}
+	// TODO: can the queue length be dynamic? static is a problem 
+	// because this will eventually fill up.
 	cm.Queue = make(chan uint32, 1000000)
 	cm.CandidateMap = make(map[uint32]bool)
 
@@ -174,7 +176,7 @@ func main() {
 		retrieval_inputs <- cm.Next()
 		counter += 1
 
-		fmt.Print(fmt.Sprintf("Summoner queue size: %d [%.1f%% to next export]\r", cm.Count(), float32(counter)/1000))
+		fmt.Print(fmt.Sprintf("Summoner queue size: %d [%.1f%% to next export]\r", cm.Count(), float32((counter % 1000) / 1000)))
 
 		// Run for approx 2 hrs then dump data.
 		if counter == 6000 && (*cpuprofile != "" || *memprofile != "") {
@@ -193,7 +195,7 @@ func main() {
 		}
 
 		// Every thousand requests save the new summoner list.
-		if counter%1000 == 0 {
+		if counter % 1000 == 0 {
 			write_candidates(&cm)
 		}
 	}
@@ -224,17 +226,23 @@ func retriever(input chan uint32, collection *mgo.Collection, cm *CandidateManag
 
 			// Write all games into permanent storage.
 			for _, game := range convert(&json_response) {
-				// Add all of the players to the candidate manager.
-
-				// Encode and store in the database.
-				encoded_gamedata, _ := gproto.Marshal(&game)
-				record := libcleo.RecordContainer{encoded_gamedata, *game.GameId, *game.Timestamp}
-
+				// Add all of the players to the candidate manager. It
+				// takes care of removing duplicates automatically.
+				for _, team := range game.Teams {
+					for _, player := range team.Players {
+						cm.Add(*player.Player.SummonerId)
+					}
+				}
+				
 				if STORE_RESPONSES {
 					// Check to see if the game already exists. If so, don't do anything.
 					record_count, _ := collection.Find(bson.M{"gameid": *game.GameId}).Count()
 
 					if record_count == 0 {
+						// Encode and store in the database.
+						encoded_gamedata, _ := gproto.Marshal(&game)
+						record := libcleo.RecordContainer{encoded_gamedata, *game.GameId, *game.Timestamp}
+
 						collection.Insert(record)
 					}
 				}

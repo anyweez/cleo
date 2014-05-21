@@ -1,5 +1,15 @@
 package main
 
+// Lolstat is the core binary that evaluates and responds to queries. It can
+// currently handle queries of the form:
+//   "How many games has [champion combination X] won against [champion combination Y]?
+//
+// It depends on the fetcher and packer binaries to prepare indices that it
+// can use for fast searching, and only stores the game ID for each game
+// (no additional metadata) in order to minimize the required memory 
+// footprint and maximize the amount of information that can be kept
+// accessible at once.
+
 import (
 	"fmt"
 	"libcleo"
@@ -17,6 +27,7 @@ func read_cgl(filename string) libcleo.LivePCGL {
 	pcgl := proto.PackedChampionGameList{}
 	live_pcgl := libcleo.LivePCGL{}
 
+	// TODO: unmarshal data.
 	//	gproto.Unmarshal(bytes, &cgl)
 	live_pcgl.All = pcgl.All
 
@@ -28,6 +39,9 @@ func read_cgl(filename string) libcleo.LivePCGL {
 }
 
 func main() {
+	// Query connection manager
+	qm := query.QueryManager{}
+	
 	// Inputs
 	query_requests := make(chan query.GameQueryRequest, 100)
 	// Outputs
@@ -36,7 +50,6 @@ func main() {
 	fmt.Printf("Loading gamelog.\n")
 	cgl := read_cgl("latest.cgl")
 
-	qm := query.QueryManager{}
 	qm.Connect()
 
 	// Kick off some goroutines that can handle queries.
@@ -45,22 +58,14 @@ func main() {
 	}
 
 	// Kick off one goroutine that can handle responding to queries.
-	go query_responder(query_completions)
+	go query_responder(query_completions, &qm)
 
 	// Infinitely loop through queries as they come in. Currently this
 	// will only handle one at a time but should be trivial to parallelize
 	// once the time is right.
 	for {
-		gqr := query.GameQueryRequest{}
-		gqr.Query = &proto.GameQuery{}
-		gqr.Id = 1
-		fmt.Println(gqr.Query)
-		gqr.Query.Winners = append(gqr.Query.Winners, proto.ChampionType_THRESH)
-
-		query_requests <- gqr
-		//		qm.Await()
-		//		query_requests <- qm.Await()
-		time.Sleep(10 * time.Second)
+		query_requests <- qm.Await()
+		time.Sleep(5 * time.Second)
 	}
 }
 
@@ -112,30 +117,34 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 			overlap(&eligible_gamelist, pcgl.Champions[champion].Winning)
 		}
 
-		//// Step #2: Eligible set (not incl. team) ////
+		//// Step #2: Eligible set ////
 		eligible_gamelist = merge(eligible_gamelist, matching_gamelist)
-		//eligible_gamelist = append(eligible_gamelist, matching_gamelist...)
 
 		// Prepare the response.
-		response := query.GameQueryResponse{}
-		response.Id = request.Id
-		response.Conn = request.Conn
+		response := query.GameQueryResponse{Id: request.Id, Conn: request.Conn}
 
-		response.Response.Available = gproto.Uint32(uint32(len(eligible_gamelist)))
-		response.Response.Matching = gproto.Uint32(uint32(len(matching_gamelist)))
-		response.Response.Total = gproto.Uint32(uint32(len(pcgl.All)))
+		response.Response = &proto.QueryResponse {
+			Available: gproto.Uint32(uint32(len(eligible_gamelist))),
+			Matching: gproto.Uint32(uint32(len(matching_gamelist))),
+			Total: gproto.Uint32(uint32(len(pcgl.All))),
+		}
 
+		// Send it to the query responder queue to take care of the 
+		// actual transmission and associated events.
 		output <- response
 	}
 }
 
-func query_responder(input chan query.GameQueryResponse) {
+func query_responder(input chan query.GameQueryResponse, qm* query.QueryManager) {
 	for {
-		response := <-input
+		// Receive a finalized response from a query handler. Time to
+		// transmit it back to the person who requested it.
+		response := <- input
 
 		fmt.Println(fmt.Sprintf("Responding to query #%d", response.Id))
-		// TODO: Send the response.
-		//		response.Conn.Send(&gproto.Marshal(response.Response))
+
+		// Send the response.
+		qm.Respond(&response)
 	}
 }
 
@@ -152,7 +161,7 @@ func overlap(first *[]uint64, second []uint64) {
 		// equal to the primary array. We should not reset this counter
 		// variable.
 		for second[parallel_counter] < (*first)[i] {
-			if parallel_counter+1 < len(second) {
+			if parallel_counter + 1 < len(second) {
 				parallel_counter += 1
 			} else {
 				// If parallel_counter is as big as it can get then none of
@@ -174,6 +183,9 @@ func overlap(first *[]uint64, second []uint64) {
 	}
 }
 
+// Merge combined two lists into a single ordered list. It assumes that
+// both input lists are ordered as well. It will only copy duplicated
+// values one time, i.e. it removes duplicates.
 func merge(first []uint64, second []uint64) []uint64 {
 	full := make([]uint64, 0, len(first)+len(second))
 
