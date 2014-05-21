@@ -22,7 +22,7 @@ import (
 )
 
 // Constants
-const API_KEY = "abebd3e9-00f2-4ba6-997d-0008c2072373"
+var API_KEY = flag.String("apikey", "", "Riot API key")
 const NUM_RETRIEVERS = 30
 const STORE_RESPONSES = false
 
