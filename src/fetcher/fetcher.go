@@ -30,13 +30,6 @@ const STORE_RESPONSES = false
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 var memprofile = flag.String("memprofile", "", "write memory profile to this file")
 
-// Data structures
-type RecordContainer struct {
-	GameData			[]byte
-	GameId				uint64
-	Timestamp			uint64
-}
-
 type JSONResponse struct {
 	Games 				[]JSONGameResponse `json:"games"`
 	SummonerId 			uint64
@@ -232,7 +225,7 @@ func retriever(input chan uint64, collection *mgo.Collection, cm *CandidateManag
 
 				// Encode and store in the database.
 				encoded_gamedata, _ := gproto.Marshal(&game)
-				record := RecordContainer{ encoded_gamedata, *game.GameId, *game.Timestamp }
+				record := libcleo.RecordContainer{ encoded_gamedata, *game.GameId, *game.Timestamp }
 
 				if STORE_RESPONSES {
 					// Check to see if the game already exists. If so, don't do anything.
@@ -274,7 +267,7 @@ func convert(response *JSONResponse) []gamelog.GameRecord {
 		plyr.SummonerId = gproto.Uint64(response.SummonerId)
 
 		pstats := gamelog.PlayerStats{}
-		pstats.ChampionId = gproto.Uint32(game.ChampionId)
+		pstats.Champion = libcleo.Rid2Cleo(game.ChampionId).Enum()
 		pstats.Player = &plyr
 				
 		if game.TeamId == 100 {

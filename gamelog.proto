@@ -6,15 +6,15 @@ import "champions.proto";
 // are optimized for determining overlap between multiple champions' 
 // game lists. All game ID's are in increasing order.
 message PackedChampionGameList {
-	message ChampionList {
+	message ChampionGameList {
 		optional ChampionType champion 	= 1;
-		repeated uint32 winning			= 2;
-		repeated uint32 losing			= 3;
+		repeated uint64 winning			= 2;
+		repeated uint64 losing			= 3;
 	}
 	
-	repeated ChampionList champions = 1;
+	repeated ChampionGameList champions = 1;
 	// All game ID's listed together.
-	repeated uint32 all				= 2;
+	repeated uint64 all					= 2;
 }
 
 message GameLog {

@@ -4,32 +4,21 @@ import "fmt"
 import "query"
 import "time"
 import "proto"
+import "libcleo"
 //import "sort"
 import gproto "code.google.com/p/goprotobuf/proto"
 
-type LivePCGL struct {
-	Champions	map[proto.ChampionType]LivePCGLRecord
-	All			[]uint32
-}
-
-type LivePCGLRecord struct {
-	Winning 	[]uint32
-	Losing		[]uint32
-}
-
 // Reads in a ChampionGameList file that can be used for searching.
 // TODO: Retrieve the file.
-func read_cgl(filename string) LivePCGL {
+func read_cgl(filename string) libcleo.LivePCGL {
 	pcgl := proto.PackedChampionGameList{}
-	live_pcgl := LivePCGL{}
+	live_pcgl := libcleo.LivePCGL{}
 
 //	gproto.Unmarshal(bytes, &cgl)	
 	live_pcgl.All = pcgl.All
 
 	for _, record := range pcgl.Champions {
-		live_pcgl.Champions[*record.Champion] = LivePCGLRecord{record.Winning , record.Losing}
-//		live_pcgl.Champions[*record.Champion].Winning = *record.Winning
-//		live_pcgl.Champions[*record.Champion].Losing = *record.Losing
+		live_pcgl.Champions[*record.Champion] = libcleo.LivePCGLRecord{record.Winning, record.Losing}
 	}
 	
 	return live_pcgl
@@ -96,7 +85,7 @@ func main() {
 // Then do the same thing for all losing champions (find the winning set
 // for them). Then merge the output from the MATCHING set with the lists
 // from the ELIGIBLE set to produce the final ELIGIBLE set.  
-func query_handler(input chan query.GameQueryRequest, pcgl *LivePCGL, output chan query.GameQueryResponse) {
+func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, output chan query.GameQueryResponse) {
 	for {
 		request := <-input
 		fmt.Println("Handling query #", request.Id)
@@ -150,7 +139,7 @@ func query_responder(input chan query.GameQueryResponse) {
 // Overlap accepts two lists of uints and reduces FIRST to the overlap
 // between both lists. 
 // Assumes that both lists are ordered.
-func overlap(first *[]uint32, second []uint32) {
+func overlap(first *[]uint64, second []uint64) {
 	// parallel_counter indexes into SECOND and may move at a different
 	// rate than i.
 	parallel_counter := 0
@@ -182,8 +171,8 @@ func overlap(first *[]uint32, second []uint32) {
 	}
 }
 
-func merge(first []uint32, second []uint32) []uint32 {
-	full := make([]uint32, 0, len(first) + len(second))
+func merge(first []uint64, second []uint64) []uint64 {
+	full := make([]uint64, 0, len(first) + len(second))
 	
 	first_i := 0
 	second_i := 0
