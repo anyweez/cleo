@@ -4,15 +4,17 @@ import "champions.proto";
 
 // ChampionGameList's are imported into lolstat for searching. These
 // are optimized for determining overlap between multiple champions' 
-// game lists.
-message ChampionGameList {
-	message ChampionList {
+// game lists. All game ID's are in increasing order.
+message PackedChampionGameList {
+	message ChampionGameList {
 		optional ChampionType champion 	= 1;
-		repeated uint32 winning			= 2;
-		repeated uint32 losing			= 3;
+		repeated uint64 winning			= 2;
+		repeated uint64 losing			= 3;
 	}
 	
-	repeated ChampionList champions = 1;
+	repeated ChampionGameList champions = 1;
+	// All game ID's listed together.
+	repeated uint64 all					= 2;
 }
 
 message GameLog {
@@ -46,7 +48,7 @@ message PlayerRank {
 
 message Player {
 	optional string name 		= 1;
-	optional uint64 summoner_id	= 2;
+	optional uint32 summoner_id	= 2;
 	
 	optional PlayerRank ranking = 3;
 }
@@ -61,7 +63,7 @@ message PlayerStats {
 	optional uint32 minions		= 6;
 	
 //	optional string champion 	= 7;
-	optional uint32 champion_id	= 8;
+//	optional uint32 champion_id	= 8;
 	optional ChampionType champion = 9;
 }
 

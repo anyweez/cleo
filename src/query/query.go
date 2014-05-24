@@ -1,7 +1,9 @@
 package query
 
-//import "adapter_league" adapter
-import "proto"
+import (
+	"fmt"
+	"proto"
+)
 
 // TODO: replace this with something real.
 type Connection struct {
@@ -23,29 +25,31 @@ type GameQueryResponse struct {
 type QueryManager struct {
 	// Connection information.
 	NextQueryId		uint32
+	ActiveCount		uint32
 }
 
 func (q *QueryManager) Connect() {
-	
 	q.NextQueryId = 1
+	q.ActiveCount = 0
 }
 
 func (q *QueryManager) Await() GameQueryRequest {
-	gqr := GameQueryRequest{}
-	gqr.Id = q.NextQueryId
+	gqr := GameQueryRequest{Id: q.NextQueryId}
 	
-	// Find out how often Thresh is on the winning team.
-	gqr.Query.Winners = append(gqr.Query.Winners, proto.ChampionType_THRESH)
+	// Find out how often Thresh is on the winning team. This is a placeholder
+	// query and should be replaced with a network listener.
+	gqr.Query = &proto.GameQuery{ Winners: []proto.ChampionType{proto.ChampionType_THRESH}, Losers: []proto.ChampionType{} }
 	
 	// Increment the query counter.
 	q.NextQueryId += 1
+	q.ActiveCount += 1
 	
 	return gqr
 }
 
-/*
-func (q *QueryManager) Respond(qr *lolstat.GameQueryResponse) {
-	fmt.Println("Events examined:", qr.Total)
-	fmt.Println(fmt.Sprintf("Matches: %d / %d", qr.Matching, qr.Available))
+func (q *QueryManager) Respond(qr *GameQueryResponse) {
+	fmt.Println("Events examined:", *qr.Response.Total)
+	fmt.Println(fmt.Sprintf("Matches: %d / %d [%.2f]", *qr.Response.Matching, *qr.Response.Available, float32(*qr.Response.Matching) / float32(*qr.Response.Available)))
+	
+	q.ActiveCount -= 1
 }
-* */

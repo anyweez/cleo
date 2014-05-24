@@ -1,25 +1,28 @@
 package main
 
-import gproto "code.google.com/p/goprotobuf/proto"
-import "labix.org/v2/mgo"
-import gamelog "proto"
-// import "net/http/pprof"
-import "runtime/pprof"
-import "encoding/json"
-import "net/http"
-import "fmt"
-import "flag"
-import "time"
-import "io/ioutil"
-import "log"
-import "strings"
-import "os"
-import "bufio"
-import "strconv"
-import "io"
+import (
+	"bufio"
+	gproto "code.google.com/p/goprotobuf/proto"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"labix.org/v2/mgo"
+	"labix.org/v2/mgo/bson"
+	"libcleo"
+	"log"
+	"net/http"
+	"os"
+	gamelog "proto"
+	"runtime/pprof"
+	"strconv"
+	"strings"
+	"time"
+)
 
 // Constants
-const API_KEY = "abebd3e9-00f2-4ba6-997d-0008c2072373"
+var API_KEY = flag.String("apikey", "", "Riot API key")
 const NUM_RETRIEVERS = 30
 const STORE_RESPONSES = true
 
@@ -27,41 +30,34 @@ const STORE_RESPONSES = true
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 var memprofile = flag.String("memprofile", "", "write memory profile to this file")
 
-// Data structures
-type RecordContainer struct {
-	GameData			[]byte
-	GameId				uint64
-	Timestamp			uint64
-}
-
 type JSONResponse struct {
-	Games 				[]JSONGameResponse `json:"games"`
-	SummonerId 			uint64
+	Games      []JSONGameResponse `json:"games"`
+	SummonerId uint32
 }
 
 type JSONGameResponse struct {
-	FellowPlayers			[]JSONPlayerResponse
-	Stats				JSONGameStatsResponse
-	
-	GameId 				uint64
-	CreateDate			uint64
-	
-	TeamId				uint32
-	ChampionId			uint32
-	
-	GameMode			string
-	GameType			string
-	GameSubType			string
+	FellowPlayers []JSONPlayerResponse
+	Stats         JSONGameStatsResponse
+
+	GameId     uint64
+	CreateDate uint64
+
+	TeamId     uint32
+	ChampionId uint32
+
+	GameMode    string
+	GameType    string
+	GameSubType string
 }
 
 type JSONGameStatsResponse struct {
-	Win				bool
+	Win bool
 }
 
 type JSONPlayerResponse struct {
-	SummonerId			uint64
-	TeamId				uint32
-	ChampionId			uint32
+	SummonerId uint32
+	TeamId     uint32
+	ChampionId uint32
 }
 
 //////////////////////////////////////////////////////////////////
@@ -69,27 +65,27 @@ type JSONPlayerResponse struct {
 //// and ensures that they're all unique in the queue.
 //////////////////////////////////////////////////////////////////
 type CandidateManager struct {
-	Queue					chan uint64
-	CandidateMap			map[uint64]bool
-	
-	count					uint32
+	Queue        chan uint32
+	CandidateMap map[uint32]bool
+
+	count uint32
 }
 
-func (cm *CandidateManager) Add(player uint64) {
+func (cm *CandidateManager) Add(player uint32) {
 	_, exists := cm.CandidateMap[player]
 	if !exists {
 		cm.CandidateMap[player] = true
 		cm.count += 1
-		
+
 		cm.Queue <- player
 	}
 }
 
-func (cm *CandidateManager) Next() uint64 {
-	player := <- cm.Queue
+func (cm *CandidateManager) Next() uint32 {
+	player := <-cm.Queue
 	// Cycle the candidate back into the queue.
 	cm.Queue <- player
-	
+
 	return player
 }
 
@@ -100,23 +96,23 @@ func (cm *CandidateManager) Count() uint32 {
 // This function reads in a list of champions from a local file to start
 // as the seeding set. The fetcher will automatically include new champions
 // it discovers on its journey as well.
-func read_summoner_ids(filename string) []uint64 {
+func read_summoner_ids(filename string) []uint32 {
 	// Read the specified file.
 	file, err := os.Open(filename)
 	if err != nil {
 		log.Panic("Cannot find file.")
 	}
 	defer file.Close()
-	
-	lines := make([]uint64, 0, 10000)
+
+	lines := make([]uint32, 0, 10000)
 	scanner := bufio.NewScanner(file)
-	
+
 	for scanner.Scan() {
-		value, _ := strconv.ParseUint(scanner.Text(), 10, 64)
-		lines = append(lines, value)
+		value, _ := strconv.ParseUint(scanner.Text(), 10, 32)
+		lines = append(lines, uint32(value))
 	}
-	
-	// Return a GameLog
+
+	// Return a set of summoner ID's.
 	return lines
 }
 
@@ -125,7 +121,7 @@ func load_starting_ids(cm *CandidateManager) {
 	summoner_ids := read_summoner_ids("champions")
 	for _, sid := range summoner_ids {
 		cm.Add(sid)
-	}		
+	}
 }
 
 func main() {
@@ -141,26 +137,32 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
+	if *API_KEY == "" {
+		log.Fatal("You must provide an API key using the -apikey flag.")
+	}
+
 	fmt.Println("Initializing...")
-	
+
 	cm := CandidateManager{}
-	cm.Queue = make(chan uint64, 1000000)
-	cm.CandidateMap = make(map[uint64]bool)
-		
-	retrieval_inputs := make(chan uint64, 100)
+	// TODO: can the queue length be dynamic? static is a problem 
+	// because this will eventually fill up.
+	cm.Queue = make(chan uint32, 1000000)
+	cm.CandidateMap = make(map[uint32]bool)
+
+	retrieval_inputs := make(chan uint32, 100)
 
 	// Connect to MongoDB instance.
 	session, _ := mgo.Dial("127.0.0.1:27017")
 	games_collection := session.DB("lolstat").C("games")
 	defer session.Close()
-	
+
 	// Kick off some retrievers that will pull from the retrieval queue.
 	for i := 0; i < NUM_RETRIEVERS; i++ {
 		go retriever(retrieval_inputs, games_collection, &cm)
 	}
 
 	load_starting_ids(&cm)
-	fmt.Println( fmt.Sprintf("Loaded %d summoners...let's do this!", cm.Count()) )
+	fmt.Println(fmt.Sprintf("Loaded %d summoners...let's do this!", cm.Count()))
 
 	counter := 0
 	// Forever: pull an summoner ID from user_queue, toss it in retrieval_inputs
@@ -168,18 +170,18 @@ func main() {
 	for {
 		// Wait for 1.20 seconds to account for the rate limiting that
 		// Riot requires.
-		time.Sleep( 1200 * time.Millisecond )
+		time.Sleep(1200 * time.Millisecond)
 
 		// Push the player to the retrieval queue.
 		retrieval_inputs <- cm.Next()
 		counter += 1
 
-		fmt.Print( fmt.Sprintf("Summoner queue size: %d [%.1f%% to next export]\r", cm.Count(), float32(counter) / 1000) )
+		fmt.Print(fmt.Sprintf("Summoner queue size: %d [%.1f%% to next export]\r", cm.Count(), float32((counter % 1000) / 1000)))
 
 		// Run for approx 2 hrs then dump data.
 		if counter == 1000 && (*cpuprofile != "" || *memprofile != "") {
 			pprof.StopCPUProfile()
-			
+
 			if *memprofile != "" {
 				mf, err := os.Create(*memprofile)
 				if err != nil {
@@ -188,7 +190,7 @@ func main() {
 				pprof.WriteHeapProfile(mf)
 				mf.Close()
 			}
-			
+
 			fmt.Println("Profiling complete")
 		}
 
@@ -199,7 +201,6 @@ func main() {
 	}
 }
 
-
 // Retrievers hang out until presented with a player to look up. Once they
 // receive a record, they issue a request to the API, convert the respones
 // into a series of GameRecord's, and insert that data into permanent
@@ -207,38 +208,43 @@ func main() {
 //
 // Note that all rate limiting is handled directly by the channel, meaning
 // that everything in this goroutine can execute as quickly as possible.
-func retriever(input chan uint64, collection *mgo.Collection, cm *CandidateManager) {
+func retriever(input chan uint32, collection *mgo.Collection, cm *CandidateManager) {
 	url := "https://prod.api.pvp.net/api/lol/na/v1.3/game/by-summoner/%d/recent?api_key=%s"
 
 	for {
-		player := <- input
+		player := <-input
 
-		resp, err := http.Get(fmt.Sprintf(url, player, API_KEY))
+		resp, err := http.Get(fmt.Sprintf(url, player, *API_KEY))
 		if err != nil {
 			log.Println("Error retrieving data:", err)
 		} else {
 			defer resp.Body.Close()
 			body, _ := ioutil.ReadAll(resp.Body)
-		
+
 			json_response := JSONResponse{}
 			json.Unmarshal(body, &json_response)
-			
+
 			// Write all games into permanent storage.
 			for _, game := range convert(&json_response) {
-				// Add all of the players to the candidate manager.
-
-				// Encode and store in the database.
-				encoded_gamedata, _ := gproto.Marshal(&game)
-				record := RecordContainer{ encoded_gamedata, *game.GameId, *game.Timestamp }
-
+				// Add all of the players to the candidate manager. It
+				// takes care of removing duplicates automatically.
+				for _, team := range game.Teams {
+					for _, player := range team.Players {
+						cm.Add(*player.Player.SummonerId)
+					}
+				}
+				
 				if STORE_RESPONSES {
-					collection.Insert(record)
-//					// Check to see if the game already exists. If so, don't do anything.
-//					record_count, _ := collection.Find( bson.M{ "gameid": *game.GameId} ).Count()
+					// Check to see if the game already exists. If so, don't do anything.
+					record_count, _ := collection.Find(bson.M{"gameid": *game.GameId}).Count()
 
-//					if record_count == 0 {
-//						collection.Insert(record)
-//					}
+					if record_count == 0 {
+						// Encode and store in the database.
+						encoded_gamedata, _ := gproto.Marshal(&game)
+						record := libcleo.RecordContainer{encoded_gamedata, *game.GameId, *game.Timestamp}
+
+						collection.Insert(record)
+					}
 				}
 			} // end for
 		}
@@ -252,51 +258,51 @@ func retriever(input chan uint64, collection *mgo.Collection, cm *CandidateManag
 // dropped here at the moment.
 func convert(response *JSONResponse) []gamelog.GameRecord {
 	games := make([]gamelog.GameRecord, 0, 10)
-	
+
 	for _, game := range response.Games {
 		// Only keep games that are matched 5v5 (no bot games, etc).
-		if 	(game.GameMode != "CLASSIC") || (game.GameType != "MATCHED_GAME") || (strings.Contains(game.GameSubType, "5x5")) {
+		if (game.GameMode != "CLASSIC") || (game.GameType != "MATCHED_GAME") || (strings.Contains(game.GameSubType, "5x5")) {
 			continue
 		}
-			
+
 		record := gamelog.GameRecord{}
-			
+
 		record.Timestamp = gproto.Uint64(game.CreateDate)
 		record.GameId = gproto.Uint64(game.GameId)
-			
+
 		team1 := gamelog.Team{}
 		team2 := gamelog.Team{}
 
 		// Add the target player and set the outcome.
 		plyr := gamelog.Player{}
-		plyr.SummonerId = gproto.Uint64(response.SummonerId)
+		plyr.SummonerId = gproto.Uint32(response.SummonerId)
 
 		pstats := gamelog.PlayerStats{}
-		pstats.ChampionId = gproto.Uint32(game.ChampionId)
+		pstats.Champion = libcleo.Rid2Cleo(game.ChampionId).Enum()
 		pstats.Player = &plyr
-				
+
 		if game.TeamId == 100 {
 			team1.Players = append(team1.Players, &pstats)
-					
+
 			team1.Victory = gproto.Bool(game.Stats.Win)
 			team2.Victory = gproto.Bool(!game.Stats.Win)
 		} else if game.TeamId == 200 {
 			team2.Players = append(team2.Players, &pstats)
-								
+
 			team1.Victory = gproto.Bool(!game.Stats.Win)
 			team2.Victory = gproto.Bool(game.Stats.Win)
 		} else {
 			log.Println("Unknown team ID found on game", game.GameId)
 		}
-			
+
 		// Add all fellow players.
 		for _, player := range game.FellowPlayers {
 			plyr := gamelog.Player{}
 			pstats := gamelog.PlayerStats{}
 
-			plyr.SummonerId = gproto.Uint64(player.SummonerId)
-			pstats.ChampionId = gproto.Uint32(player.ChampionId)
-				
+			plyr.SummonerId = gproto.Uint32(player.SummonerId)
+			pstats.Champion = libcleo.Rid2Cleo(player.ChampionId).Enum()
+
 			if player.TeamId == 100 {
 				pstats.Player = &plyr
 				team1.Players = append(team1.Players, &pstats)
@@ -306,10 +312,10 @@ func convert(response *JSONResponse) []gamelog.GameRecord {
 			} else {
 				log.Println("Unknown team ID found on game", game.GameId)
 			}
-		}	
-		games = append(games, record)	
+		}
+		games = append(games, record)
 	}
-	
+
 	return games
 }
 
@@ -322,6 +328,6 @@ func write_candidates(cm *CandidateManager) {
 	defer f.Close()
 
 	for k, _ := range cm.CandidateMap {
-		io.WriteString(f, strconv.FormatUint(k, 10) + "\n")
+		io.WriteString(f, strconv.FormatUint(uint64(k), 10) + "\n")
 	}
 }
