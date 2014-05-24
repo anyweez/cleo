@@ -23,7 +23,6 @@ import (
 
 // Constants
 var API_KEY = flag.String("apikey", "", "Riot API key")
-const NUM_RETRIEVERS = 30
 const STORE_RESPONSES = false
 
 // Flags
@@ -100,7 +99,7 @@ func read_summoner_ids(filename string) []uint32 {
 	// Read the specified file.
 	file, err := os.Open(filename)
 	if err != nil {
-		log.Panic("Cannot find file.")
+		log.Fatal("Cannot find champions file.")
 	}
 	defer file.Close()
 
@@ -149,18 +148,12 @@ func main() {
 	cm.Queue = make(chan uint32, 1000000)
 	cm.CandidateMap = make(map[uint32]bool)
 
-	retrieval_inputs := make(chan uint32, 100)
-
 	// Connect to MongoDB instance.
 	session, _ := mgo.Dial("127.0.0.1:27017")
 	games_collection := session.DB("lolstat").C("games")
 	defer session.Close()
 
 	// Kick off some retrievers that will pull from the retrieval queue.
-	for i := 0; i < NUM_RETRIEVERS; i++ {
-		go retriever(retrieval_inputs, games_collection, &cm)
-	}
-
 	load_starting_ids(&cm)
 	fmt.Println(fmt.Sprintf("Loaded %d summoners...let's do this!", cm.Count()))
 
@@ -173,7 +166,7 @@ func main() {
 		time.Sleep(1200 * time.Millisecond)
 
 		// Push the player to the retrieval queue.
-		retrieval_inputs <- cm.Next()
+		go retrieve(cm.Next(), games_collection, &cm)
 		counter += 1
 
 		fmt.Print(fmt.Sprintf("Summoner queue size: %d [%.1f%% to next export]\r", cm.Count(), float32((counter % 1000) / 1000)))
@@ -195,7 +188,7 @@ func main() {
 		}
 
 		// Every thousand requests save the new summoner list.
-		if counter % 1000 == 0 {
+		if (counter % 1000 == 0) && STORE_RESPONSES {
 			write_candidates(&cm)
 		}
 	}
@@ -208,46 +201,42 @@ func main() {
 //
 // Note that all rate limiting is handled directly by the channel, meaning
 // that everything in this goroutine can execute as quickly as possible.
-func retriever(input chan uint32, collection *mgo.Collection, cm *CandidateManager) {
+func retrieve(summoner uint32, collection *mgo.Collection, cm *CandidateManager) {
 	url := "https://prod.api.pvp.net/api/lol/na/v1.3/game/by-summoner/%d/recent?api_key=%s"
 
-	for {
-		player := <-input
+	resp, err := http.Get(fmt.Sprintf(url, summoner, *API_KEY))
+	if err != nil {
+		log.Println("Error retrieving data:", err)
+	} else {
+		defer resp.Body.Close()
+		body, _ := ioutil.ReadAll(resp.Body)
 
-		resp, err := http.Get(fmt.Sprintf(url, player, *API_KEY))
-		if err != nil {
-			log.Println("Error retrieving data:", err)
-		} else {
-			defer resp.Body.Close()
-			body, _ := ioutil.ReadAll(resp.Body)
+		json_response := JSONResponse{}
+		json.Unmarshal(body, &json_response)
 
-			json_response := JSONResponse{}
-			json.Unmarshal(body, &json_response)
-
-			// Write all games into permanent storage.
-			for _, game := range convert(&json_response) {
-				// Add all of the players to the candidate manager. It
-				// takes care of removing duplicates automatically.
-				for _, team := range game.Teams {
-					for _, player := range team.Players {
-						cm.Add(*player.Player.SummonerId)
-					}
+		// Write all games into permanent storage.
+		for _, game := range convert(&json_response) {
+			// Add all of the players to the candidate manager. It
+			// takes care of removing duplicates automatically.
+			for _, team := range game.Teams {
+				for _, player := range team.Players {
+					cm.Add(*player.Player.SummonerId)
 				}
+			}
 				
-				if STORE_RESPONSES {
-					// Check to see if the game already exists. If so, don't do anything.
-					record_count, _ := collection.Find(bson.M{"gameid": *game.GameId}).Count()
+			if STORE_RESPONSES {
+				// Check to see if the game already exists. If so, don't do anything.
+				record_count, _ := collection.Find(bson.M{"gameid": *game.GameId}).Count()
 
-					if record_count == 0 {
-						// Encode and store in the database.
-						encoded_gamedata, _ := gproto.Marshal(&game)
-						record := libcleo.RecordContainer{encoded_gamedata, *game.GameId, *game.Timestamp}
+				if record_count == 0 {
+					// Encode and store in the database.
+					encoded_gamedata, _ := gproto.Marshal(&game)
+					record := libcleo.RecordContainer{encoded_gamedata, *game.GameId, *game.Timestamp}
 
-						collection.Insert(record)
-					}
+					collection.Insert(record)
 				}
-			} // end for
-		}
+			}
+		} // end for
 	}
 }
 
@@ -313,6 +302,9 @@ func convert(response *JSONResponse) []gamelog.GameRecord {
 				log.Println("Unknown team ID found on game", game.GameId)
 			}
 		}
+		// Add teams to the game record.
+		record.Teams = append(record.Teams, &team1, &team2)
+		
 		games = append(games, record)
 	}
 
