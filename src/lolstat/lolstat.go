@@ -11,31 +11,89 @@ package main
 // accessible at once.
 
 import (
+	gproto "code.google.com/p/goprotobuf/proto"
 	"fmt"
+	"io/ioutil"
 	"libcleo"
+	"log"
 	"proto"
 	"query"
+	"sort"
 	"time"
 )
 
-//import "sort"
-import gproto "code.google.com/p/goprotobuf/proto"
+// Build a wrapper data structure that can be used to enable fast sorting
+// on the game ID's.
+type idList []uint64
+
+func (x idList) Len() int {
+	return len(x)
+}
+
+func (x idList) Less(i, j int) bool {
+	return x[i] < x[j]
+}
+
+func (x idList) Swap(i, j int) {
+	tmp := x[i]
+	
+	x[i] = x[j]
+	x[j] = tmp
+}
+
+func (x idList) toUint() []uint64 {
+	l := make([]uint64, 0, len(x))
+	
+	for _, val := range x {
+		l = append(l, val)
+	}
+	
+	return l
+}
+
+func get_sorted(x []uint64) []uint64 {
+	ids := make(idList, 0, len(x))
+
+	for _, val := range x {
+		ids = append(ids, val)
+	}	
+	sort.Sort(ids)
+		
+	return ids.toUint()
+}
 
 // Reads in a ChampionGameList file that can be used for searching.
 // TODO: Retrieve the file.
-func read_cgl(filename string) libcleo.LivePCGL {
-	pcgl := proto.PackedChampionGameList{}
-	live_pcgl := libcleo.LivePCGL{}
-
-	// TODO: unmarshal data.
-	//	gproto.Unmarshal(bytes, &cgl)
-	live_pcgl.All = pcgl.All
-
-	for _, record := range pcgl.Champions {
-		live_pcgl.Champions[*record.Champion] = libcleo.LivePCGLRecord{record.Winning, record.Losing}
+func read_pcgl(filename string) libcleo.LivePCGL {
+	packed_pcgl := proto.PackedChampionGameList{}
+	// Unmarshal data.
+	bytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		log.Fatal("Couldn't read PCGL;", filename, "does not exist.")
 	}
+	gproto.Unmarshal(bytes, &packed_pcgl)	
+	
+	// Convert to format that's faster to search through.
+	pcgl := libcleo.LivePCGL{}
+	pcgl.Champions = make(map[proto.ChampionType]libcleo.LivePCGLRecord)
+	pcgl.All = make([]uint64, 0, 100)
+	
+	for _, champ := range packed_pcgl.Champions {
+		_, exists := pcgl.Champions[*champ.Champion]
 
-	return live_pcgl
+		if !exists {
+			pcgl.Champions[*champ.Champion] = libcleo.LivePCGLRecord{}
+		}
+		r := pcgl.Champions[*champ.Champion]
+		r.Winning = get_sorted(champ.Winning)
+		r.Losing = get_sorted(champ.Losing)
+		
+		pcgl.Champions[*champ.Champion] = r
+	}
+		
+	pcgl.All = get_sorted(packed_pcgl.All)
+	
+	return pcgl
 }
 
 func main() {
@@ -48,13 +106,14 @@ func main() {
 	query_completions := make(chan query.GameQueryResponse, 100)
 
 	fmt.Printf("Loading gamelog.\n")
-	cgl := read_cgl("latest.cgl")
+	pcgl := read_pcgl("latest.pcgl")
+	log.Println("Read", len(pcgl.All), "events into PCGL.")
 
 	qm.Connect()
 
 	// Kick off some goroutines that can handle queries.
 	for i := 0; i < 1; i++ {
-		go query_handler(query_requests, &cgl, query_completions)
+		go query_handler(query_requests, &pcgl, query_completions)
 	}
 
 	// Kick off one goroutine that can handle responding to queries.
@@ -99,26 +158,37 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 		fmt.Println("Handling query #", request.Id)
 
 		// Eligible gamelist contains all games that match, irrespective of team.
-		eligible_gamelist := pcgl.All
-
+		eligible_wins_gamelist := make([]uint64, len(pcgl.All))
+		eligible_losses_gamelist := make([]uint64, len(pcgl.All))
+		
 		// Matching gamelist contains all games that match, respective of team.
-		matching_gamelist := pcgl.All
+		matching_gamelist := make([]uint64, len(pcgl.All))
+		
+		copy(eligible_wins_gamelist, pcgl.All)
+		copy(eligible_losses_gamelist, pcgl.All)
+		copy(matching_gamelist, pcgl.All)
 
 		// Merge all game ID's, first matching the winning parameters.
 		for _, champion := range request.Query.Winners {
 			// Update the matching gamelist to include just the overlap between these two lists.
 			overlap(&matching_gamelist, pcgl.Champions[champion].Winning)
-			overlap(&eligible_gamelist, pcgl.Champions[champion].Losing)
+			overlap(&eligible_losses_gamelist, pcgl.Champions[champion].Losing)
 		}
 
 		// Then match all losers.
-		for _, champion := range request.Query.Losers {
-			overlap(&matching_gamelist, pcgl.Champions[champion].Losing)
-			overlap(&eligible_gamelist, pcgl.Champions[champion].Winning)
+		if len(request.Query.Losers) > 0 {
+			for _, champion := range request.Query.Losers {
+				overlap(&matching_gamelist, pcgl.Champions[champion].Losing)
+				overlap(&eligible_wins_gamelist, pcgl.Champions[champion].Winning)
+			}
+		} else {
+			eligible_wins_gamelist = eligible_wins_gamelist[:0]
 		}
 
-		//// Step #2: Eligible set ////
-		eligible_gamelist = merge(eligible_gamelist, matching_gamelist)
+		// Step #2: Eligible set includes all that matched and all those that contained
+		//   the proposed champions in the teams provided (victory status ignored).
+		eligible_gamelist := merge(eligible_wins_gamelist, eligible_losses_gamelist)
+		eligible_gamelist = merge(matching_gamelist, eligible_gamelist)
 
 		// Prepare the response.
 		response := query.GameQueryResponse{Id: request.Id, Conn: request.Conn}
@@ -156,6 +226,11 @@ func overlap(first *[]uint64, second []uint64) {
 	// rate than i.
 	parallel_counter := 0
 
+	if len(*first) == 0 || len(second) == 0 {
+		(*first) = (*first)[:0]
+		return
+	}
+	
 	for i := 0; i < len(*first); i++ {
 		// Loop through until the second array's value is greater than or
 		// equal to the primary array. We should not reset this counter
@@ -177,7 +252,6 @@ func overlap(first *[]uint64, second []uint64) {
 			(*first)[i] = 0
 			(*first) = append((*first)[:i], (*first)[i+1:]...)
 
-			fmt.Println(*first)
 			i -= 1
 		}
 	}
@@ -187,6 +261,8 @@ func overlap(first *[]uint64, second []uint64) {
 // both input lists are ordered as well. It will only copy duplicated
 // values one time, i.e. it removes duplicates.
 func merge(first []uint64, second []uint64) []uint64 {
+//	fmt.Println("Merge first:", first)
+//	fmt.Println("Merge second:", second)
 	full := make([]uint64, 0, len(first)+len(second))
 
 	first_i := 0
@@ -194,7 +270,7 @@ func merge(first []uint64, second []uint64) []uint64 {
 
 	// Move through the list until we get to the end of one of them.
 	for first_i < len(first) && second_i < len(second) {
-		fmt.Println(fmt.Sprintf("first=%d, second=%d", first_i, second_i))
+//		fmt.Println(fmt.Sprintf("first=%d, second=%d", first_i, second_i))
 		// If next value in FIRST is less than next value in SECOND,
 		// copy value from FIRST and move on.
 		if first[first_i] < second[second_i] {
