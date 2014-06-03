@@ -3,6 +3,7 @@ package libcleo
 import (
 	"proto"
 	"log"
+	"strings"
 )
 
 // Some basic data structures.
@@ -146,6 +147,16 @@ var champion_map = map[uint32]proto.ChampionType {
 	266	: proto.ChampionType_AATROX,
 	267	: proto.ChampionType_NAMI,
 	412	: proto.ChampionType_THRESH,
+}
+
+func String2ChampionType(instr string) proto.ChampionType {
+	for id, str := range proto.ChampionType_name {
+		if strings.ToLower(str) == strings.ToLower(instr) {
+			return proto.ChampionType(id)
+		}
+	}
+	
+	return proto.ChampionType_UNKNOWN
 }
 
 // This function converts a Riot champion ID into an internal Cleo

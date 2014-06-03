@@ -35,7 +35,7 @@ func main() {
 	games_collection.Find( bson.M{} ).All(&results)
 	
 	log.Println("Retrieved", len(results), "records. Packing...")
-	for _, record := range results[:100] {
+	for _, record := range results {
 		game := proto.GameRecord{}
 		gproto.Unmarshal(record.GameData, &game)
 		

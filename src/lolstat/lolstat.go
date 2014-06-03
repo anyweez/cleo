@@ -113,18 +113,16 @@ func main() {
 
 	// Kick off some goroutines that can handle queries.
 	for i := 0; i < 1; i++ {
-		go query_handler(query_requests, &pcgl, query_completions)
+		go query_handler(query_requests, &pcgl, query_completions, &qm)
 	}
-
-	// Kick off one goroutine that can handle responding to queries.
-	go query_responder(query_completions, &qm)
 
 	// Infinitely loop through queries as they come in. Currently this
 	// will only handle one at a time but should be trivial to parallelize
 	// once the time is right.
 	for {
 		query_requests <- qm.Await()
-		time.Sleep(5 * time.Second)
+		
+		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -152,10 +150,10 @@ func main() {
 // Then do the same thing for all losing champions (find the winning set
 // for them). Then merge the output from the MATCHING set with the lists
 // from the ELIGIBLE set to produce the final ELIGIBLE set.
-func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, output chan query.GameQueryResponse) {
+func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, output chan query.GameQueryResponse, qm *query.QueryManager) {
 	for {
 		request := <-input
-		fmt.Println("Handling query #", request.Id)
+		log.Println("Handling query #", request.Id)
 
 		// Eligible gamelist contains all games that match, irrespective of team.
 		eligible_wins_gamelist := make([]uint64, len(pcgl.All))
@@ -191,8 +189,9 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 		eligible_gamelist = merge(matching_gamelist, eligible_gamelist)
 
 		// Prepare the response.
-		response := query.GameQueryResponse{Id: request.Id, Conn: request.Conn}
-
+		response := query.GameQueryResponse{Id: request.Id}
+		response.Request = &request
+		
 		response.Response = &proto.QueryResponse {
 			Available: gproto.Uint32(uint32(len(eligible_gamelist))),
 			Matching: gproto.Uint32(uint32(len(matching_gamelist))),
@@ -201,10 +200,11 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 
 		// Send it to the query responder queue to take care of the 
 		// actual transmission and associated events.
-		output <- response
+		qm.Respond(&response)
 	}
 }
 
+/*
 func query_responder(input chan query.GameQueryResponse, qm* query.QueryManager) {
 	for {
 		// Receive a finalized response from a query handler. Time to
@@ -217,6 +217,7 @@ func query_responder(input chan query.GameQueryResponse, qm* query.QueryManager)
 		qm.Respond(&response)
 	}
 }
+* */
 
 // Overlap accepts two lists of uints and reduces FIRST to the overlap
 // between both lists.
