@@ -78,6 +78,7 @@
 		// updated. Whenever they're updated we should fire a request to
 		// fetch new stats for the newly defined teams.
 		$scope.$on('teamUpdate', function(data) {
+			console.log("Making new data request.");
 			// Retrieve some sample data.
 			$http.get("data/stats.json").success(function(data) {
 				$scope.stats = data;
@@ -92,5 +93,5 @@
 // X. when num allies == 5, don't show new_champion
 // X. work for enemies
 // 4. autocomplete
-// 5. make web request when champion is added to array
+// X. make web request when champion is added to array
 // 6. update stats when response is received 

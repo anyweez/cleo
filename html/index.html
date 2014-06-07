@@ -46,6 +46,15 @@
 	    display: inline-block;
 	  }
 	  
+	  .team_stats {
+		  width: 40%;
+		  padding: 1%;
+		  vertical-align: top;
+		  display: inline-block;
+		  
+		  border: 1px solid black;
+	  }
+	  
 	  .stat_col {
         width: 65%;
         border: 1px solid black;
@@ -99,9 +108,18 @@
 
     </div>
     <div class="stat_col" ng-controller="StatsController">
-      <h2>Stats</h2>
-      <p>Probability of success: {{ stats.percent }}%</p>
-      <p>Some? {{ some }}</p>
+	  <h2>Stats</h2>
+<!--      <div ng-hide="stats">Specify a team.</div>  
+	  <div ng-show="stats"> -->
+	  <div>
+        <p>Probability of success: {{ stats.percent }}%</p>
+        <p>These teams were found in <b>{{ stats.available }}</b> of the <b>{{ stats.total }}</b> known games.</p>
+        
+        <div class="team_stats">
+          <h3>Allies: best additions</h3>
+        </div>
+        
+      </div>
     </div>
   </body>
 </html>
