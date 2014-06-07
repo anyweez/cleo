@@ -1,70 +1,107 @@
-<html>
+<!doctype html>
+<html ng-app="lolstatApp">
   <head>
-    <title>{{.Title}}</title>
+    <title>LoLStat</title>
+    
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.2.17/angular.min.js"></script>
+	<script src="js/app.js"></script>
     
     <style type="text/css">
+      h3 {
+        margin: 0;
+        padding: 3px;
+	  }
+	  
+	  input {
+        padding: 4px;
+        width: 260px;
+	  }
+	  
+	  .team p {
+		margin: 0;
+		padding: 3px;
+	  }
+
+      .champion {
+	    padding: 2px;
+	  }
+
+      .champ_img {
+	    width: 64px;
+	    height: 64px;  
+	  }
+	  
 	  .team {
-	    display: inline-block;
-	    width: 30%;
-	    padding: 1%;
 	    border: 1px solid black;
+	    padding: 1%;
+	    margin: 1%;
+	  }
+
+      .team_col {
+	    width: 30%;
+	    border: 1px solid black;
+	    
+	    vertical-align: top;
+	    display: inline-block;
 	  }
 	  
-	  .stat {
-		display: inline-block;
-		width: 15%;
-		margin: 5%;
-		  
-		border: 1px solid black;
-		text-align: center;
-	  }
-	  
-	  .major_stat {
-		font-size: 24px;
-		font-weight: bold;
-	  }
+	  .stat_col {
+        width: 65%;
+        border: 1px solid black;
+        padding: 1%;
+        
+        vertical-align: top;
+        display: inline-block;
+      }
+
     </style>
   </head>
 
-  <body>
+  <body ng-controller="AppController">
     <h1>LoLStat</h1>
   
-    <div class="team">
-	  <h2>Allied team</h2>
-	   {{ if .Allies }}
-         {{ range .Allies }}
-         <div class="champion">
-           <p>{{.Name}}</p>  
-         </div>
-         {{end}}
-       {{else}}
-       <div class="no_champion">
-         <p style="font-style: italic">no champions provided</p>  
-       </div>
-       {{end}}
-    </div>
-
-    <div class="stat">
-      <div class="stat_block">
-        <p class="major_stat">{{.Matching_Percentage}}%</p>
-        <p class="minor_stat">{{.Matching}} / {{.Available}}, {{.Total}} total</p>
+    <div class="team_col">
+	  <!-- Allied team controller -->
+      <div class="team" ng-controller="TeamController" ng-init="side = 'ally'">
+	    <h2>Allies</h2>
+	    <div class="champion" ng-repeat="champ in team">
+	      <img class="champ_img" src="{{champ.img}}" />
+	      <div style="display: inline-block; vertical-align: top;">
+	        <h3>{{ champ.name }}</h3>
+	        <p>{{ champ.games }} games</p>
+	      </div>
+	    </div>
+	    <div class="new_champion" ng-hide="teamFull">
+	      <img class="champ_img" src="" />
+	      <div style="display: inline-block; vertical-align: top;">
+	        <input type="text" placeholder="Champion name" ng-model="nextChampion" ng-change="validateChampion()" />
+	      </div>
+	    </div>
       </div>
-    </div>
+      <!-- Enemy team controller -->
+      <div class="team" ng-controller="TeamController" ng-init="side = 'enemy'">
+	    <h2>Enemies</h2>
+	    <div class="champion" ng-repeat="champ in team">
+	      <img class="champ_img" src="{{champ.img}}" />
+	      <div style="display: inline-block; vertical-align: top;">
+	        <h3>{{ champ.name }}</h3>
+	        <p>{{ champ.games }} games</p>
+	      </div>
+	    </div>
+	    <div class="new_champion" ng-hide="teamFull">
+	      <img class="champ_img" src="" />
+	      <div style="display: inline-block; vertical-align: top;">
+	        <input type="text" placeholder="Champion name" ng-model="nextChampion" ng-change="validateChampion()" />
+	      </div>
+	    </div>
+      </div>
 
-    <div class="team">
-	  <h2>Enemy team</h2>
-	   {{ if .Enemies }}
-         {{ range .Enemies }}
-         <div class="champion">
-           <p>{{.Name}}</p>  
-         </div>
-         {{end}}
-       {{else}}
-       <div class="no_champion">
-         <p style="font-style: italic">no champions provided</p>  
-       </div>
-       {{end}}
     </div>
-  
+    <div class="stat_col" ng-controller="StatsController">
+      <h2>Stats</h2>
+      <p>Probability of success: {{ stats.percent }}%</p>
+      <p>Some? {{ some }}</p>
+    </div>
   </body>
 </html>
