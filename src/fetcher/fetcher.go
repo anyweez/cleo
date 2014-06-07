@@ -145,7 +145,7 @@ func main() {
 	cm := CandidateManager{}
 	// TODO: can the queue length be dynamic? static is a problem 
 	// because this will eventually fill up.
-	cm.Queue = make(chan uint32, 1000000)
+	cm.Queue = make(chan uint32, 50000000)
 	cm.CandidateMap = make(map[uint32]bool)
 
 	// Connect to MongoDB instance.

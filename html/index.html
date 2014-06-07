@@ -1,0 +1,70 @@
+<html>
+  <head>
+    <title>{{.Title}}</title>
+    
+    <style type="text/css">
+	  .team {
+	    display: inline-block;
+	    width: 30%;
+	    padding: 1%;
+	    border: 1px solid black;
+	  }
+	  
+	  .stat {
+		display: inline-block;
+		width: 15%;
+		margin: 5%;
+		  
+		border: 1px solid black;
+		text-align: center;
+	  }
+	  
+	  .major_stat {
+		font-size: 24px;
+		font-weight: bold;
+	  }
+    </style>
+  </head>
+
+  <body>
+    <h1>LoLStat</h1>
+  
+    <div class="team">
+	  <h2>Allied team</h2>
+	   {{ if .Allies }}
+         {{ range .Allies }}
+         <div class="champion">
+           <p>{{.Name}}</p>  
+         </div>
+         {{end}}
+       {{else}}
+       <div class="no_champion">
+         <p style="font-style: italic">no champions provided</p>  
+       </div>
+       {{end}}
+    </div>
+
+    <div class="stat">
+      <div class="stat_block">
+        <p class="major_stat">{{.Matching_Percentage}}%</p>
+        <p class="minor_stat">{{.Matching}} / {{.Available}}, {{.Total}} total</p>
+      </div>
+    </div>
+
+    <div class="team">
+	  <h2>Enemy team</h2>
+	   {{ if .Enemies }}
+         {{ range .Enemies }}
+         <div class="champion">
+           <p>{{.Name}}</p>  
+         </div>
+         {{end}}
+       {{else}}
+       <div class="no_champion">
+         <p style="font-style: italic">no champions provided</p>  
+       </div>
+       {{end}}
+    </div>
+  
+  </body>
+</html>
