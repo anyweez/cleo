@@ -7,11 +7,10 @@ import (
 	"log"
 	"net"
 	"proto"
-//	zmq "github.com/pebbe/zmq4"
 )
 
 type GameQueryRequest struct {
-	Id 			uint32
+	Id			string
 	Query 		*proto.GameQuery
 	
 	Identity	string
@@ -19,22 +18,22 @@ type GameQueryRequest struct {
 }
 
 type GameQueryResponse struct {
-	Id			uint32
-	
 	Response	*proto.QueryResponse	
 	Request		*GameQueryRequest
 }
 
 type QueryManager struct {
 	// Connection information.
-	NextQueryId		uint32
 	ActiveCount		uint32
 
 	Listener		*net.TCPListener
 }
 
+func GetQueryId(qry proto.GameQuery) string {
+	return fmt.Sprintf("Q%d.%d", qry.QueryProcess, qry.QueryId)
+}
+
 func (q *QueryManager) Connect() {
-	q.NextQueryId = 1
 	q.ActiveCount = 0	
 	
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP:net.IPv4zero, Port:14002})
@@ -50,7 +49,7 @@ func (q *QueryManager) Connect() {
 }
 
 func (q *QueryManager) Await() GameQueryRequest {
-	gqr := GameQueryRequest{Id: q.NextQueryId}
+	gqr := GameQueryRequest{}
 
 	log.Println("Awaiting request.")
 	conn, _ := (*q.Listener).AcceptTCP()
@@ -61,21 +60,22 @@ func (q *QueryManager) Await() GameQueryRequest {
 	msg, _ := rw.ReadString('|')
 	log.Println(fmt.Sprintf("Request received (%d bytes)", len(msg)))
 	
-	query := proto.GameQuery{}
-	merr := gproto.Unmarshal( []byte(msg[:len(msg)-1]), &query )
+	qry := proto.GameQuery{}
+	merr := gproto.Unmarshal( []byte(msg[:len(msg)-1]), &qry )
 	
 	if merr != nil {
 		log.Fatal("Error unmarshaling query from frontend.")
 	}
 	
-	gqr.Query = &query
+	// Form a query ID string that can be used for logging.
+	gqr.Id = GetQueryId(qry)
+	gqr.Query = &qry
 	
-	for _, qry := range query.Winners {
-		log.Println("Requires champion", qry)
+	for _, q := range qry.Winners {
+		log.Println(fmt.Sprintf("%s: requires champion %s", gqr.Id, q))
 	}
 	
 	// Increment the query counter.
-	q.NextQueryId += 1
 	q.ActiveCount += 1
 	
 	return gqr
@@ -90,7 +90,7 @@ func (q *QueryManager) Respond(qr *GameQueryResponse) {
 	rw := bufio.NewReadWriter(bufio.NewReader(qr.Request.Connection), bufio.NewWriter(qr.Request.Connection))
 	rw.WriteString(string(data) + "|")
 	rw.Flush()
-	log.Println("Sent response.")
+	log.Println(fmt.Sprintf("%s: sent response", qr.Request.Id))
 	
 	q.ActiveCount -= 1
 }

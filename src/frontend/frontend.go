@@ -4,12 +4,15 @@ import (
 	"bufio"
 	gproto "code.google.com/p/goprotobuf/proto"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"libcleo"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"proto"
+	"query"
 	"strings"
 )
 
@@ -32,6 +35,9 @@ type PageParams struct {
 	Valid		bool
 }
 
+// TODO: this probably shouldn't be a global.
+var query_id = 0;
+
 // Fetch index.html (the main app). Simple, static file.
 func index_handler(w http.ResponseWriter, r *http.Request) {
 	log.Println("index requested")
@@ -49,14 +55,13 @@ func simple_team(w http.ResponseWriter, r *http.Request) {
 	allies := strings.Split(r.FormValue("allies"), ",")
 	enemies := strings.Split(r.FormValue("enemies"), ",")
 
-
-	query := form_request(allies, enemies)
+	qry := form_request(allies, enemies)
 	response := proto.QueryResponse{}
 	
-	is_valid := validate_request(query)
+	is_valid := validate_request(qry)
 	if is_valid {
-		log.Println("SimpleTeam: valid query [allies=;enemies=]")
-		response = request(query)
+		log.Println( fmt.Sprintf("%s: valid team query [allies=;enemies=]", query.GetQueryId(qry)) )
+		response = request(qry)
 		data, err := json.Marshal(response)
 		
 		if err != nil {
@@ -71,14 +76,14 @@ func simple_team(w http.ResponseWriter, r *http.Request) {
 }
 
 // Validate current just checks to make sure that all tokens are real.
-func validate_request(query proto.GameQuery) bool {
-	for _, winner := range query.Winners {
+func validate_request(qry proto.GameQuery) bool {
+	for _, winner := range qry.Winners {
 		if winner == proto.ChampionType_UNKNOWN {
 			return false
 		}
 	}
 
-	for _, loser := range query.Losers {
+	for _, loser := range qry.Losers {
 		if loser == proto.ChampionType_UNKNOWN {
 			return false
 		}
@@ -88,38 +93,44 @@ func validate_request(query proto.GameQuery) bool {
 }
 
 func form_request(allies []string, enemies []string) proto.GameQuery {
-	query := proto.GameQuery{}
+	qry := proto.GameQuery{}
 	
-	// Map the 
+	qry.QueryProcess = gproto.Uint64( uint64(os.Getpid()) )
+	qry.QueryId = gproto.Uint64( uint64(query_id) )
+	
+	query_id += 1 
+	
+	// Map the strings specified in the url to ChampionType's.
 	for _, name := range allies {
 		if len(name) > 0 {
-			log.Println("Ally:", libcleo.String2ChampionType(name))
-			query.Winners = append(query.Winners, libcleo.String2ChampionType(name))
+			log.Println( fmt.Sprintf("%s: ally required = %s", query.GetQueryId(qry), libcleo.String2ChampionType(name)) )
+			qry.Winners = append(qry.Winners, libcleo.String2ChampionType(name))
 		}
 	}
 	
 	for _, name := range enemies {
 		if len(name) > 0 {
-			log.Println("Enemy:", libcleo.String2ChampionType(name))
-			query.Winners = append(query.Losers, libcleo.String2ChampionType(name))
+			log.Println( fmt.Sprintf("%s: enemy required = %s", query.GetQueryId(qry), libcleo.String2ChampionType(name)) )
+			qry.Winners = append(qry.Losers, libcleo.String2ChampionType(name))
 		}
 	}
 
-	return query
+	return qry
 }
 
-func request(query proto.GameQuery) proto.QueryResponse {
+func request(qry proto.GameQuery) proto.QueryResponse {
 	//  Socket to talk to server
-	log.Println("Connecting to cleo server...")
+	log.Println( fmt.Sprintf("%s: connecting to cleo server...", query.GetQueryId(qry)) )
 	conn, cerr := net.DialTCP("tcp", nil, &net.TCPAddr{IP:net.ParseIP("127.0.0.1"), Port: 14002})
 	
 	if cerr != nil {
-		log.Println("Couldn't connect to a Cleo server.")
+		log.Println( fmt.Sprintf("%s: couldn't connect to a Cleo server.", query.GetQueryId(qry)) )
+		return proto.QueryResponse{Successful: gproto.Bool(false)}
 	}
 	
 	// Form a GameQuery.
-	data, _ := gproto.Marshal(&query)
-	log.Println("CLEO_SEND: allies(thresh) enemies()")
+	data, _ := gproto.Marshal(&qry)	
+	log.Println( fmt.Sprintf("%s: query sent", query.GetQueryId(qry)) )
 	
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
 	rw.WriteString(string(data) + "|")
@@ -127,10 +138,11 @@ func request(query proto.GameQuery) proto.QueryResponse {
 	
 	// Unmarshal the response.
 	response := proto.QueryResponse{}
-	log.Println("Awaiting response...")
-	reply, _ := rw.ReadString('|')
-	
+	log.Println( fmt.Sprintf("%s: awaiting response...", query.GetQueryId(qry)) )
+
+	reply, _ := rw.ReadString('|')	
 	gproto.Unmarshal( []byte(reply[:len(reply)-1]), &response )	
+	log.Println( fmt.Sprintf("%s: valid response received", query.GetQueryId(qry)) )
 	
 	return response
 }

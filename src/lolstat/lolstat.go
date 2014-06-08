@@ -120,8 +120,7 @@ func main() {
 	// will only handle one at a time but should be trivial to parallelize
 	// once the time is right.
 	for {
-		query_requests <- qm.Await()
-		
+		query_requests <- qm.Await()		
 		time.Sleep(1 * time.Second)
 	}
 }
@@ -153,7 +152,7 @@ func main() {
 func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, output chan query.GameQueryResponse, qm *query.QueryManager) {
 	for {
 		request := <-input
-		log.Println("Handling query #", request.Id)
+		log.Println(fmt.Sprintf("%s: handling query", request.Id))
 
 		// Eligible gamelist contains all games that match, irrespective of team.
 		eligible_wins_gamelist := make([]uint64, len(pcgl.All))
@@ -189,35 +188,22 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 		eligible_gamelist = merge(matching_gamelist, eligible_gamelist)
 
 		// Prepare the response.
-		response := query.GameQueryResponse{Id: request.Id}
+		response := query.GameQueryResponse{}
 		response.Request = &request
 		
 		response.Response = &proto.QueryResponse {
 			Available: gproto.Uint32(uint32(len(eligible_gamelist))),
 			Matching: gproto.Uint32(uint32(len(matching_gamelist))),
 			Total: gproto.Uint32(uint32(len(pcgl.All))),
+			Successful: gproto.Bool(true),
 		}
 
+		log.Println(fmt.Sprintf("%s: response generated", request.Id))
 		// Send it to the query responder queue to take care of the 
 		// actual transmission and associated events.
 		qm.Respond(&response)
 	}
 }
-
-/*
-func query_responder(input chan query.GameQueryResponse, qm* query.QueryManager) {
-	for {
-		// Receive a finalized response from a query handler. Time to
-		// transmit it back to the person who requested it.
-		response := <- input
-
-		fmt.Println(fmt.Sprintf("Responding to query #%d", response.Id))
-
-		// Send the response.
-		qm.Respond(&response)
-	}
-}
-* */
 
 // Overlap accepts two lists of uints and reduces FIRST to the overlap
 // between both lists.
@@ -262,8 +248,6 @@ func overlap(first *[]uint64, second []uint64) {
 // both input lists are ordered as well. It will only copy duplicated
 // values one time, i.e. it removes duplicates.
 func merge(first []uint64, second []uint64) []uint64 {
-//	fmt.Println("Merge first:", first)
-//	fmt.Println("Merge second:", second)
 	full := make([]uint64, 0, len(first)+len(second))
 
 	first_i := 0
@@ -271,7 +255,6 @@ func merge(first []uint64, second []uint64) []uint64 {
 
 	// Move through the list until we get to the end of one of them.
 	for first_i < len(first) && second_i < len(second) {
-//		fmt.Println(fmt.Sprintf("first=%d, second=%d", first_i, second_i))
 		// If next value in FIRST is less than next value in SECOND,
 		// copy value from FIRST and move on.
 		if first[first_i] < second[second_i] {
