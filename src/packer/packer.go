@@ -101,13 +101,16 @@ func main() {
 
 	pcgl := libcleo.LivePCGL{}
 	pcgl.Champions = make(map[proto.ChampionType]libcleo.LivePCGLRecord)
-	pcgl.All = make([]uint64, 0, 100)
+	pcgl.All = make([]libcleo.GameId, 0, 100)
 
 	// Read all records from Mongo.
 	session, _ := mgo.Dial("127.0.0.1:27017")
 	games_collection := session.DB("lolstat").C("games")
 	defer session.Close()
 	log.Println("Connection to MongoDB instance established.")
+
+	gid_map := make(map[uint64]libcleo.GameId)
+	var next_gid libcleo.GameId = 0
 
 	// For each record:
 	//	- Get all champions. For each champion:
@@ -126,6 +129,19 @@ func main() {
 		game := proto.GameRecord{}
 		gproto.Unmarshal(result.GameData, &game)
 
+		// Map game ID's to something much closer to zero (and tightly
+		// packed). This will make it possible to work in 32-bit land
+		// at serving time until we get beyond 4B games. That's far away.
+		gid, exists := gid_map[*game.GameId]
+		if exists {
+			game.GameId = gproto.Uint64( uint64(gid) )
+		} else {
+			gid_map[*game.GameId] = next_gid
+			game.GameId = gproto.Uint64( uint64(next_gid) )
+
+			next_gid += 1
+		}
+
 		for _, team := range game.Teams {
 			for _, player := range team.Players {
 				_, exists := pcgl.Champions[*player.Champion]
@@ -140,17 +156,17 @@ func main() {
 				// If the team won, add this game to this champion's win
 				// pool.
 				if *team.Victory {
-					r.Winning = append(pcgl.Champions[*player.Champion].Winning, *game.GameId)
+					r.Winning = append(pcgl.Champions[*player.Champion].Winning, libcleo.GameId(*game.GameId))
 					// If they lost, add it to the loss pool.
 				} else {
-					r.Losing = append(pcgl.Champions[*player.Champion].Losing, *game.GameId)
+					r.Losing = append(pcgl.Champions[*player.Champion].Losing, libcleo.GameId(*game.GameId))
 				}
 				// Reassign to the master struct
 				pcgl.Champions[*player.Champion] = r
 			}
 		}
 
-		pcgl.All = append(pcgl.All, *game.GameId)
+		pcgl.All = append(pcgl.All, libcleo.GameId(*game.GameId))
 
 		// TODO: remove this.
 		if current == 100000 {
@@ -167,13 +183,24 @@ func main() {
 		record := proto.PackedChampionGameList_ChampionGameList{}
 		record.Champion = k.Enum()
 
-		record.Winning = v.Winning
-		record.Losing = v.Losing
+		// Copy over casted values. They're the same type but v.Winning
+		// uses an aliased type and Go doesn't recognize that they're the
+		// same...
+		// TODO: is there a better (faster, more memory efficient) way
+		// to do this without removing the type alias?
+		for _, val := range v.Winning {
+			record.Winning = append(record.Winning, uint32(val))
+		}
+		for _, val := range v.Losing {
+			record.Losing = append(record.Losing, uint32(val))
+		}
 
 		packed_pcgl.Champions = append(packed_pcgl.Champions, &record)
 	}
 
-	packed_pcgl.All = pcgl.All
+	for _, val := range pcgl.All {
+		packed_pcgl.All = append(packed_pcgl.All, uint32(val))
+	}
 	data, _ := gproto.Marshal(&packed_pcgl)
 
 	// Write to file.
@@ -181,7 +208,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Could not write PCGL file.")
 	} else {
-		log.Println(fmt.Sprintf("Successfully wrote %d records to all.pcgl", len(packed_pcgl.All)))
+		log.Println(fmt.Sprintf("Successfully wrote %d records to all.pcgl.", len(packed_pcgl.All)))
 	}
 
 	write_statics("html/static/data/championList.json", pcgl)

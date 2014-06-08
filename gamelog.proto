@@ -8,13 +8,13 @@ import "champions.proto";
 message PackedChampionGameList {
 	message ChampionGameList {
 		optional ChampionType champion 	= 1;
-		repeated uint64 winning			= 2;
-		repeated uint64 losing			= 3;
+		repeated uint32 winning			= 2;
+		repeated uint32 losing			= 3;
 	}
 	
 	repeated ChampionGameList champions = 1;
 	// All game ID's listed together.
-	repeated uint64 all					= 2;
+	repeated uint32 all					= 2;
 }
 
 message GameLog {
@@ -23,6 +23,7 @@ message GameLog {
 	optional uint64 updated		= 2;
 }
 
+// This structure uses a 64-bit game_id because it's used prior to packing.
 message GameRecord {
 	repeated Team teams 		= 1;
 	optional uint64 timestamp 	= 2;

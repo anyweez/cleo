@@ -11,20 +11,22 @@ import (
 // LivePCGL and LivePCGLRecord are both used at query runtime.
 type LivePCGL struct {
 	Champions map[proto.ChampionType]LivePCGLRecord
-	All       []uint64
+	All       []GameId
 }
 
 type LivePCGLRecord struct {
-	Winning []uint64
-	Losing  []uint64
+	Winning []GameId
+	Losing  []GameId
 }
 
 // RecordContainer describes what a row in the MongoDB is composed of.
 type RecordContainer struct {
 	GameData  []byte
-	GameId    uint64
+	GameId    uint64		// 64-bit because it's used pre-packing.
 	Timestamp uint64
 }
+
+type GameId uint32
 
 // Based on version 4.7.16 from Riot API.
 var champion_map = map[uint32]proto.ChampionType{
