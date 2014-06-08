@@ -7,8 +7,10 @@ import "champions.proto";
 // Of the games that include these team compositions, how many of them
 // resulted in wins for "winners" and losses for "losers"?
 message GameQuery {
-	repeated ChampionType winners = 1;
-	repeated ChampionType losers = 2;
+	optional uint64 query_process = 1;
+	optional uint64 query_id = 2;
+	repeated ChampionType winners = 3;
+	repeated ChampionType losers = 4;
 }
 
 message QueryResponse {
@@ -22,4 +24,7 @@ message QueryResponse {
 	// The number of events that contain the team compositions with the
 	// desired outcome (the numerator).
 	optional uint32 matching = 3;
+	
+	// Marks whether the query completed successfully.
+	optional bool successful = 4;
 }
