@@ -23,6 +23,7 @@ import (
 
 // Constants
 var API_KEY = flag.String("apikey", "", "Riot API key")
+
 const STORE_RESPONSES = true
 
 // Flags
@@ -143,7 +144,7 @@ func main() {
 	fmt.Println("Initializing...")
 
 	cm := CandidateManager{}
-	// TODO: can the queue length be dynamic? static is a problem 
+	// TODO: can the queue length be dynamic? static is a problem
 	// because this will eventually fill up.
 	cm.Queue = make(chan uint32, 50000000)
 	cm.CandidateMap = make(map[uint32]bool)
@@ -169,7 +170,7 @@ func main() {
 		go retrieve(cm.Next(), games_collection, &cm)
 		counter += 1
 
-		fmt.Print(fmt.Sprintf("Summoner queue size: %d [%.1f%% to next export]\r", cm.Count(), float32((counter % 1000) / 1000)))
+		fmt.Print(fmt.Sprintf("Summoner queue size: %d [%.1f%% to next export]\r", cm.Count(), float32((counter%1000)/1000)))
 
 		// Run for approx 2 hrs then dump data.
 		if counter == 1000 && (*cpuprofile != "" || *memprofile != "") {
@@ -188,7 +189,7 @@ func main() {
 		}
 
 		// Every thousand requests save the new summoner list.
-		if (counter % 1000 == 0) && STORE_RESPONSES {
+		if (counter%1000 == 0) && STORE_RESPONSES {
 			write_candidates(&cm)
 		}
 	}
@@ -223,7 +224,7 @@ func retrieve(summoner uint32, collection *mgo.Collection, cm *CandidateManager)
 					cm.Add(*player.Player.SummonerId)
 				}
 			}
-				
+
 			if STORE_RESPONSES {
 				// Check to see if the game already exists. If so, don't do anything.
 				record_count, _ := collection.Find(bson.M{"gameid": *game.GameId}).Count()
@@ -304,7 +305,7 @@ func convert(response *JSONResponse) []gamelog.GameRecord {
 		}
 		// Add teams to the game record.
 		record.Teams = append(record.Teams, &team1, &team2)
-		
+
 		games = append(games, record)
 	}
 
@@ -320,6 +321,6 @@ func write_candidates(cm *CandidateManager) {
 	defer f.Close()
 
 	for k, _ := range cm.CandidateMap {
-		io.WriteString(f, strconv.FormatUint(uint64(k), 10) + "\n")
+		io.WriteString(f, strconv.FormatUint(uint64(k), 10)+"\n")
 	}
 }

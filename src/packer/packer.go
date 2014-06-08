@@ -6,15 +6,15 @@ package main
 
 import (
 	gproto "code.google.com/p/goprotobuf/proto"
+	"encoding/json"
 	"flag"
 	"fmt"
-	"net/http"
 	"io/ioutil"
-	"encoding/json"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	"libcleo"
 	"log"
+	"net/http"
 	"proto"
 	"strings"
 )
@@ -26,7 +26,7 @@ var API_KEY = flag.String("apikey", "", "Riot API key")
  * JSON response that we get back from Riot's API.
  */
 type StaticRequestInfo struct {
-	Data		map[string]StaticEntry
+	Data map[string]StaticEntry
 }
 
 /**
@@ -36,15 +36,15 @@ type StaticRequestInfo struct {
  * the value that comes in.
  */
 type StaticEntry struct {
-	Id 			uint32 	`json:"id"`
-	Name 		string	`json:"name"`
-	Shortname	string	`json:"shortname"`
-	Title		string	`json:"title"`
-	Img			string	`json:"img"`
-	Games		uint32	`json:"games"`
+	Id        uint32 `json:"id"`
+	Name      string `json:"name"`
+	Shortname string `json:"shortname"`
+	Title     string `json:"title"`
+	Img       string `json:"img"`
+	Games     uint32 `json:"games"`
 }
 
-/** 
+/**
  * This function generates static output that can be consumed by the
  * frontend based on data compiled during the packing process. Additional
  * metadata for each champion is also fetched from Riot and included in
@@ -57,10 +57,10 @@ type StaticEntry struct {
  */
 func write_statics(filename string, pcgl libcleo.LivePCGL) {
 	entries := StaticRequestInfo{}
-	
-	url := "https://na.api.pvp.net/api/lol/static-data/na/v1.2/champion?&api_key=%s"	
+
+	url := "https://na.api.pvp.net/api/lol/static-data/na/v1.2/champion?&api_key=%s"
 	log.Println("Requesting latest champion data from Riot...")
-	
+
 	// Retrieve a list of all champions according to Riot, along with
 	// some core info about each (name, title, etc)
 	resp, err := http.Get(fmt.Sprintf(url, *API_KEY))
@@ -70,22 +70,22 @@ func write_statics(filename string, pcgl libcleo.LivePCGL) {
 	}
 	defer resp.Body.Close()
 	body, _ := ioutil.ReadAll(resp.Body)
-	
+
 	json.Unmarshal(body, &entries)
-	
+
 	output := make([]StaticEntry, 0, 200)
-	
+
 	for _, entry := range entries.Data {
 		champ := libcleo.Rid2Cleo(entry.Id)
-		
+
 		entry.Id = uint32(champ)
 		entry.Shortname = strings.ToLower(strings.Replace(entry.Name, " ", "_", -1))
 		entry.Img = fmt.Sprintf("http://ddragon.leagueoflegends.com/cdn/4.9.1/img/champion/%s.png", strings.Replace(entry.Name, " ", "", -1))
-		entry.Games = uint32( len(pcgl.Champions[champ].Winning) + len(pcgl.Champions[champ].Losing) )
-		
+		entry.Games = uint32(len(pcgl.Champions[champ].Winning) + len(pcgl.Champions[champ].Losing))
+
 		output = append(output, entry)
 	}
-	
+
 	data, _ := json.Marshal(output)
 	ioutil.WriteFile(filename, data, 0644)
 	log.Println(fmt.Sprintf("Written static champion file to %s", filename))
@@ -98,7 +98,7 @@ func main() {
 	if *API_KEY == "" {
 		log.Fatal("You must provide an API key using the -apikey flag.")
 	}
-	
+
 	pcgl := libcleo.LivePCGL{}
 	pcgl.Champions = make(map[proto.ChampionType]libcleo.LivePCGLRecord)
 	pcgl.All = make([]uint64, 0, 100)
@@ -115,21 +115,21 @@ func main() {
 	//		- If loss, add to .Losing
 	//		- In all cases add to pcgl.All
 	result := libcleo.RecordContainer{}
-	query := games_collection.Find( bson.M{} )
+	query := games_collection.Find(bson.M{})
 	result_iter := query.Iter()
 	total_count, _ := query.Count()
 	current := 1
 
 	for result_iter.Next(&result) {
 		fmt.Print(fmt.Sprintf("Packing %d of %d...", current, total_count), "\r")
-		
+
 		game := proto.GameRecord{}
 		gproto.Unmarshal(result.GameData, &game)
-		
+
 		for _, team := range game.Teams {
 			for _, player := range team.Players {
 				_, exists := pcgl.Champions[*player.Champion]
-				
+
 				if !exists {
 					pcgl.Champions[*player.Champion] = libcleo.LivePCGLRecord{}
 				}
@@ -139,9 +139,9 @@ func main() {
 
 				// If the team won, add this game to this champion's win
 				// pool.
-				if *team.Victory {			
+				if *team.Victory {
 					r.Winning = append(pcgl.Champions[*player.Champion].Winning, *game.GameId)
-				// If they lost, add it to the loss pool.
+					// If they lost, add it to the loss pool.
 				} else {
 					r.Losing = append(pcgl.Champions[*player.Champion].Losing, *game.GameId)
 				}
@@ -149,31 +149,31 @@ func main() {
 				pcgl.Champions[*player.Champion] = r
 			}
 		}
-		
+
 		pcgl.All = append(pcgl.All, *game.GameId)
 
 		// TODO: remove this.
 		if current == 100000 {
-				break
+			break
 		}
-		
+
 		current += 1
 	}
-	
+
 	// Then convert into the serializable form.
 	packed_pcgl := proto.PackedChampionGameList{}
-	
+
 	for k, v := range pcgl.Champions {
 		record := proto.PackedChampionGameList_ChampionGameList{}
 		record.Champion = k.Enum()
-		
+
 		record.Winning = v.Winning
 		record.Losing = v.Losing
-		
+
 		packed_pcgl.Champions = append(packed_pcgl.Champions, &record)
 	}
-	
-	packed_pcgl.All = pcgl.All	
+
+	packed_pcgl.All = pcgl.All
 	data, _ := gproto.Marshal(&packed_pcgl)
 
 	// Write to file.
@@ -183,6 +183,6 @@ func main() {
 	} else {
 		log.Println(fmt.Sprintf("Successfully wrote %d records to all.pcgl", len(packed_pcgl.All)))
 	}
-	
+
 	write_statics("html/static/data/championList.json", pcgl)
 }

@@ -6,7 +6,7 @@ package main
 //
 // It depends on the fetcher and packer binaries to prepare indices that it
 // can use for fast searching, and only stores the game ID for each game
-// (no additional metadata) in order to minimize the required memory 
+// (no additional metadata) in order to minimize the required memory
 // footprint and maximize the amount of information that can be kept
 // accessible at once.
 
@@ -36,18 +36,18 @@ func (x idList) Less(i, j int) bool {
 
 func (x idList) Swap(i, j int) {
 	tmp := x[i]
-	
+
 	x[i] = x[j]
 	x[j] = tmp
 }
 
 func (x idList) toUint() []uint64 {
 	l := make([]uint64, 0, len(x))
-	
+
 	for _, val := range x {
 		l = append(l, val)
 	}
-	
+
 	return l
 }
 
@@ -56,9 +56,9 @@ func get_sorted(x []uint64) []uint64 {
 
 	for _, val := range x {
 		ids = append(ids, val)
-	}	
+	}
 	sort.Sort(ids)
-		
+
 	return ids.toUint()
 }
 
@@ -71,13 +71,13 @@ func read_pcgl(filename string) libcleo.LivePCGL {
 	if err != nil {
 		log.Fatal("Couldn't read PCGL;", filename, "does not exist.")
 	}
-	gproto.Unmarshal(bytes, &packed_pcgl)	
-	
+	gproto.Unmarshal(bytes, &packed_pcgl)
+
 	// Convert to format that's faster to search through.
 	pcgl := libcleo.LivePCGL{}
 	pcgl.Champions = make(map[proto.ChampionType]libcleo.LivePCGLRecord)
 	pcgl.All = make([]uint64, 0, 100)
-	
+
 	for _, champ := range packed_pcgl.Champions {
 		_, exists := pcgl.Champions[*champ.Champion]
 
@@ -87,19 +87,19 @@ func read_pcgl(filename string) libcleo.LivePCGL {
 		r := pcgl.Champions[*champ.Champion]
 		r.Winning = get_sorted(champ.Winning)
 		r.Losing = get_sorted(champ.Losing)
-		
+
 		pcgl.Champions[*champ.Champion] = r
 	}
-		
+
 	pcgl.All = get_sorted(packed_pcgl.All)
-	
+
 	return pcgl
 }
 
 func main() {
 	// Query connection manager
 	qm := query.QueryManager{}
-	
+
 	// Inputs
 	query_requests := make(chan query.GameQueryRequest, 100)
 	// Outputs
@@ -120,7 +120,7 @@ func main() {
 	// will only handle one at a time but should be trivial to parallelize
 	// once the time is right.
 	for {
-		query_requests <- qm.Await()		
+		query_requests <- qm.Await()
 		time.Sleep(1 * time.Second)
 	}
 }
@@ -157,10 +157,10 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 		// Eligible gamelist contains all games that match, irrespective of team.
 		eligible_wins_gamelist := make([]uint64, len(pcgl.All))
 		eligible_losses_gamelist := make([]uint64, len(pcgl.All))
-		
+
 		// Matching gamelist contains all games that match, respective of team.
 		matching_gamelist := make([]uint64, len(pcgl.All))
-		
+
 		copy(eligible_wins_gamelist, pcgl.All)
 		copy(eligible_losses_gamelist, pcgl.All)
 		copy(matching_gamelist, pcgl.All)
@@ -190,16 +190,16 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 		// Prepare the response.
 		response := query.GameQueryResponse{}
 		response.Request = &request
-		
-		response.Response = &proto.QueryResponse {
-			Available: gproto.Uint32(uint32(len(eligible_gamelist))),
-			Matching: gproto.Uint32(uint32(len(matching_gamelist))),
-			Total: gproto.Uint32(uint32(len(pcgl.All))),
+
+		response.Response = &proto.QueryResponse{
+			Available:  gproto.Uint32(uint32(len(eligible_gamelist))),
+			Matching:   gproto.Uint32(uint32(len(matching_gamelist))),
+			Total:      gproto.Uint32(uint32(len(pcgl.All))),
 			Successful: gproto.Bool(true),
 		}
 
 		log.Println(fmt.Sprintf("%s: response generated", request.Id))
-		// Send it to the query responder queue to take care of the 
+		// Send it to the query responder queue to take care of the
 		// actual transmission and associated events.
 		qm.Respond(&response)
 	}
@@ -217,13 +217,13 @@ func overlap(first *[]uint64, second []uint64) {
 		(*first) = (*first)[:0]
 		return
 	}
-	
+
 	for i := 0; i < len(*first); i++ {
 		// Loop through until the second array's value is greater than or
 		// equal to the primary array. We should not reset this counter
 		// variable.
 		for second[parallel_counter] < (*first)[i] {
-			if parallel_counter + 1 < len(second) {
+			if parallel_counter+1 < len(second) {
 				parallel_counter += 1
 			} else {
 				// If parallel_counter is as big as it can get then none of
