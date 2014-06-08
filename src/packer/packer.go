@@ -6,16 +6,87 @@ package main
 
 import (
 	gproto "code.google.com/p/goprotobuf/proto"
+	"flag"
 	"fmt"
+	"net/http"
 	"io/ioutil"
+	"encoding/json"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	"libcleo"
 	"log"
 	"proto"
+	"strings"
 )
 
+var API_KEY = flag.String("apikey", "", "Riot API key")
+
+type StaticRequestInfo struct {
+	Data		map[string]StaticEntry
+}
+
+type StaticEntry struct {
+	Id 			uint32 	`json:"id"`
+	Name 		string	`json:"name"`
+	Shortname	string	`json:"shortname"`
+	Title		string	`json:"title"`
+	Img			string	`json:"img"`
+	Games		uint32	`json:"games"`
+}
+
+// This function generates static output that can be consumed by the
+// frontend based on data compiled during the packing process. Additional
+// metadata for each champion is also fetched from Riot and included in
+// the output.
+//
+// This function currently writes out championList.json, a file that's
+// consumed by frontends that includes a list of all champions and some
+// metadata about them, including how many games are included in the
+// PCGL for them.
+func write_statics(filename string, pcgl libcleo.LivePCGL) {
+	entries := StaticRequestInfo{}
+	
+	url := "https://na.api.pvp.net/api/lol/static-data/na/v1.2/champion?&api_key=%s"	
+	log.Println("Requesting latest champion data from Riot...")
+	
+	// Retrieve a list of all champions according to Riot, along with
+	// some core info about each (name, title, etc)
+	resp, err := http.Get(fmt.Sprintf(url, *API_KEY))
+	if err != nil {
+		log.Println("Error retrieving data:", err)
+		return
+	}
+	defer resp.Body.Close()
+	body, _ := ioutil.ReadAll(resp.Body)
+	
+	json.Unmarshal(body, &entries)
+	
+	output := make([]StaticEntry, 0, 200)
+	
+	for _, entry := range entries.Data {
+		champ := libcleo.Rid2Cleo(entry.Id)
+		
+		entry.Id = uint32(champ)
+		entry.Shortname = strings.ToLower(strings.Replace(entry.Name, " ", "_", -1))
+		entry.Img = fmt.Sprintf("http://ddragon.leagueoflegends.com/cdn/4.9.1/img/champion/%s.png", strings.Replace(entry.Name, " ", "", -1))
+		entry.Games = uint32( len(pcgl.Champions[champ].Winning) + len(pcgl.Champions[champ].Losing) )
+		
+		output = append(output, entry)
+	}
+	
+	data, _ := json.Marshal(output)
+	ioutil.WriteFile(filename, data, 0644)
+	log.Println(fmt.Sprintf("Written static champion file to %s", filename))
+}
+
 func main() {
+	// TODO: Make this part optional via a command line flag.
+	flag.Parse()
+
+	if *API_KEY == "" {
+		log.Fatal("You must provide an API key using the -apikey flag.")
+	}
+	
 	pcgl := libcleo.LivePCGL{}
 	pcgl.Champions = make(map[proto.ChampionType]libcleo.LivePCGLRecord)
 	pcgl.All = make([]uint64, 0, 100)
@@ -94,4 +165,6 @@ func main() {
 	} else {
 		log.Println(fmt.Sprintf("Successfully wrote %d records to all.pcgl", len(packed_pcgl.All)))
 	}
+	
+	write_statics("html/static/data/championList.json", pcgl)
 }
