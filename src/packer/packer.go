@@ -21,10 +21,20 @@ import (
 
 var API_KEY = flag.String("apikey", "", "Riot API key")
 
+/**
+ * StaticRequestInfo defines the data that should be extracted from the
+ * JSON response that we get back from Riot's API.
+ */
 type StaticRequestInfo struct {
 	Data		map[string]StaticEntry
 }
 
+/**
+ * StaticEntry defines what a single entry in the output JSON looks
+ * like. It also acts as the receiving structure for each row in the
+ * parent StaticRequestInfo, but some of the fields are mutated from
+ * the value that comes in.
+ */
 type StaticEntry struct {
 	Id 			uint32 	`json:"id"`
 	Name 		string	`json:"name"`
@@ -34,15 +44,17 @@ type StaticEntry struct {
 	Games		uint32	`json:"games"`
 }
 
-// This function generates static output that can be consumed by the
-// frontend based on data compiled during the packing process. Additional
-// metadata for each champion is also fetched from Riot and included in
-// the output.
-//
-// This function currently writes out championList.json, a file that's
-// consumed by frontends that includes a list of all champions and some
-// metadata about them, including how many games are included in the
-// PCGL for them.
+/** 
+ * This function generates static output that can be consumed by the
+ * frontend based on data compiled during the packing process. Additional
+ * metadata for each champion is also fetched from Riot and included in
+ * the output.
+ *
+ * This function currently writes out championList.json, a file that's
+ * consumed by frontends that includes a list of all champions and some
+ * metadata about them, including how many games are included in the
+ * PCGL for them.
+ */
 func write_statics(filename string, pcgl libcleo.LivePCGL) {
 	entries := StaticRequestInfo{}
 	
@@ -139,6 +151,12 @@ func main() {
 		}
 		
 		pcgl.All = append(pcgl.All, *game.GameId)
+
+		// TODO: remove this.
+		if current == 100000 {
+				break
+		}
+		
 		current += 1
 	}
 	

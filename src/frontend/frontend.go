@@ -51,6 +51,12 @@ func index_handler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+/**
+ * This function is a handler for basic team queries that specify a
+ * list of allies and enemies. It builds a query from the URL parameters
+ * and sends it to a Cleo backend. Once the Cleo backend responds it
+ * serializes the response to JSON and returns it to the client.
+ */
 func simple_team(w http.ResponseWriter, r *http.Request) {
 	allies := strings.Split(r.FormValue("allies"), ",")
 	enemies := strings.Split(r.FormValue("enemies"), ",")
