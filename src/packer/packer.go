@@ -31,13 +31,17 @@ func main() {
 	//		- If team won, add game id to pcgl.Champions[champion].Winning
 	//		- If loss, add to .Losing
 	//		- In all cases add to pcgl.All
-	results := []libcleo.RecordContainer{}
-	games_collection.Find( bson.M{} ).All(&results)
-	
-	log.Println("Retrieved", len(results), "records. Packing...")
-	for _, record := range results {
+	result := libcleo.RecordContainer{}
+	query := games_collection.Find( bson.M{} )
+	result_iter := query.Iter()
+	total_count, _ := query.Count()
+	current := 1
+
+	for result_iter.Next(&result) {
+		fmt.Print(fmt.Sprintf("Packing %d of %d...", current, total_count), "\r")
+		
 		game := proto.GameRecord{}
-		gproto.Unmarshal(record.GameData, &game)
+		gproto.Unmarshal(result.GameData, &game)
 		
 		for _, team := range game.Teams {
 			for _, player := range team.Players {
@@ -64,6 +68,7 @@ func main() {
 		}
 		
 		pcgl.All = append(pcgl.All, *game.GameId)
+		current += 1
 	}
 	
 	// Then convert into the serializable form.
