@@ -3,8 +3,11 @@
   <head>
     <title>LoLStat</title>
     
+    <!-- insert web 2.0 goodness -->
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
     <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.2.17/angular.min.js"></script>
+    <script src="//twitter.github.io/typeahead.js/releases/latest/typeahead.bundle.js"></script>
+	<script src="//builds.handlebarsjs.com.s3.amazonaws.com/handlebars-v1.3.0.js"></script>
 	<script src="static/js/app.js"></script>
     
     <style type="text/css">
@@ -55,14 +58,101 @@
 		  border: 1px solid black;
 	  }
 	  
-	  .stat_col {
+	.stat_col {
         width: 65%;
         border: 1px solid black;
         padding: 1%;
         
-        vertical-align: top;
-        display: inline-block;
-      }
+		vertical-align: top;
+		display: inline-block;
+	}
+
+      // Dropdown menu
+      // Based on styles from https://github.com/jharding/typeahead.js-bootstrap.css
+	.twitter-typeahead .tt-query, .twitter-typeahead .tt-hint {
+		margin-bottom: 0;
+	}
+
+	.tt-dropdown-menu {
+		min-width: 300px;
+		margin-top: 2px;
+		padding: 5px 0;
+		background-color: #fff;
+		border: 1px solid #ccc;
+		border: 1px solid rgba(0,0,0,.2);
+		*border-right-width: 2px;
+		*border-bottom-width: 2px;
+		border-radius: 6px;
+			-webkit-border-radius: 6px;
+			-moz-border-radius: 6px;
+		box-shadow: 0 5px 10px rgba(0,0,0,.2);
+			-moz-box-shadow: 0 5px 10px rgba(0,0,0,.2);
+			-webkit-box-shadow: 0 5px 10px rgba(0,0,0,.2);
+		background-clip: padding-box;
+			-webkit-background-clip: padding-box;
+			-moz-background-clip: padding;
+	}
+
+	.tt-suggestion {
+		display: block;
+		padding: 3px 20px;
+		margin: 3px 0 3px 0;
+  
+		cursor: pointer;
+	}
+
+	.tt-suggestion.tt-is-under-cursor {
+		color: #fff;
+		background-color: #0081c2;
+		background-image: -moz-linear-gradient(top, #0088cc, #0077b3);
+		background-image: -webkit-gradient(linear, 0 0, 0 100%, from(#0088cc), to(#0077b3));
+		background-image: -webkit-linear-gradient(top, #0088cc, #0077b3);
+		background-image: -o-linear-gradient(top, #0088cc, #0077b3);
+		background-image: linear-gradient(to bottom, #0088cc, #0077b3);
+		background-repeat: repeat-x;
+		filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#ff0088cc', endColorstr='#ff0077b3', GradientType=0)
+	}
+
+	.tt-suggestion.tt-is-under-cursor a {
+		color: #fff;
+	}
+
+	.tt-suggestion p {
+		margin: 0;
+	}
+	/* Autocomplete styles */
+	.ac-block {
+		display: inline-block;
+		width: 200px;
+		vertical-align: top;
+		padding: 1px;
+	}
+	
+    .ac-title {
+		font-size: 1em;
+		font-weight: bold;
+		display: inline-block;
+		width: 50%;
+	}
+	
+	.ac-label {
+		font-size: .8em;
+		
+		display:inline-block;
+		float: right;
+	}
+	
+	.ac-subtitle {
+		font-size: .9em;
+		color: #666;
+	}
+	
+	.ac-img {
+		width: 48px;
+		height: 48px;
+		display: inline-block;
+	}
+
 
     </style>
   </head>
@@ -78,13 +168,13 @@
 	      <img class="champ_img" src="{{champ.img}}" />
 	      <div style="display: inline-block; vertical-align: top;">
 	        <h3>{{ champ.name }}</h3>
-	        <p>{{ champ.games }} games</p>
+	        <p>[champ.games] games</p>
 	      </div>
 	    </div>
 	    <div class="new_champion" ng-hide="teamFull">
 	      <img class="champ_img" src="" />
-	      <div style="display: inline-block; vertical-align: top;">
-	        <input type="text" placeholder="Champion name" ng-model="nextChampion" ng-change="validateChampion()" />
+	      <div style="display: inline-block; vertical-align: top; width: 50%; height: 50px;">
+	        <input class="championInput" type="text" placeholder="Champion name" ng-model="nextChampion" ng-change="validateChampion()" />
 	      </div>
 	    </div>
       </div>
@@ -95,13 +185,13 @@
 	      <img class="champ_img" src="{{champ.img}}" />
 	      <div style="display: inline-block; vertical-align: top;">
 	        <h3>{{ champ.name }}</h3>
-	        <p>{{ champ.games }} games</p>
+	        <p>[champ.games] games</p>
 	      </div>
 	    </div>
 	    <div class="new_champion" ng-hide="teamFull">
 	      <img class="champ_img" src="" />
 	      <div style="display: inline-block; vertical-align: top;">
-	        <input type="text" placeholder="Champion name" ng-model="nextChampion" ng-change="validateChampion()" />
+	        <input class="championInput" type="text" placeholder="Champion name" ng-model="nextChampion" ng-change="validateChampion()" />
 	      </div>
 	    </div>
       </div>
@@ -113,8 +203,7 @@
 	  <div ng-show="stats"> -->
 	  <div>
         <p>Probability of success: {{ stats.percent }}%</p>
-        <p>These teams were found in <b>{{ stats.available }}</b> of the <b>{{ stats.total }}</b> known games.</p>
-        
+        <p>These teams were found in <b>{{ stats.available }}</b> of the <b>{{ stats.total }}</b> known games, and won <b>{{ stats.matching }}</b> of them.</p> 
         <div class="team_stats">
           <h3>Allies: best additions</h3>
         </div>

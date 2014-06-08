@@ -146,5 +146,5 @@ func main() {
     })
 
     log.Println("Awaiting requests...")
-    log.Fatal("Couldn't listen on port 80:", http.ListenAndServe(":80", nil))
+    log.Fatal("Couldn't listen on port 8088:", http.ListenAndServe(":8088", nil))
 }
