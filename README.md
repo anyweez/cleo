@@ -51,10 +51,11 @@ are for using cleo specifically for its currently intended purpose stated above.
 paths inside of the script depending on where you installed goprotobuf in step 1.
 
 3) Build all of the executables.
-  * go build fetcher
-  * go build packer
-  * go build lolstat
-  * go build frontend
+
+	go build fetcher
+	go build packer
+	go build lolstat
+	go build frontend
 
 4) Run fetcher to build up a list of games. Fetcher will require access to a MongoDB instance.
 
@@ -74,4 +75,5 @@ adds new champions to add support for them in the frontend.
 	./lolstat (to start the backend service)
 	./frontend (to start the frontend web server that talks to lolstat)
 
-7) You can view the frontend by visiting http://<domain>:8088/ in your favorite (Angular-supported) web browser.
+7) You can view the frontend by visiting http://[domain]:8088/ in your favorite (Angular-supported) web browser.
+For example, if you're running locally you can go to http://localhost:8088/.
