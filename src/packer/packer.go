@@ -16,7 +16,9 @@ import (
 	"log"
 	"net/http"
 	"proto"
+	"regexp"
 	"strings"
+	"time"
 )
 
 var API_KEY = flag.String("apikey", "", "Riot API key")
@@ -42,6 +44,12 @@ type StaticEntry struct {
 	Title     string `json:"title"`
 	Img       string `json:"img"`
 	Games     uint32 `json:"games"`
+}
+
+type StaticOutputJSON struct {
+	LastUpdated		int64			`json:"lastUpdated"`
+	NumGames		int				`json:"numGames"`
+	Champions		[]StaticEntry	`json:"champions"`
 }
 
 /**
@@ -73,20 +81,30 @@ func write_statics(filename string, pcgl libcleo.LivePCGL) {
 
 	json.Unmarshal(body, &entries)
 
-	output := make([]StaticEntry, 0, 200)
+	outjson := StaticOutputJSON{}
+	// Export the number of games in this pcgl export.
+	outjson.NumGames = len(pcgl.All)
+	outjson.LastUpdated = time.Now().Unix()
+	
+	outjson.Champions = make([]StaticEntry, 0, 200)
+	// Remove non-alphanumeric characters.
+	reg, _ := regexp.Compile("[^A-Za-z0-9 ]+")
 
 	for _, entry := range entries.Data {
 		champ := libcleo.Rid2Cleo(entry.Id)
+		clean_name := reg.ReplaceAllString(entry.Name, "")
 
 		entry.Id = uint32(champ)
-		entry.Shortname = strings.ToLower(strings.Replace(entry.Name, " ", "_", -1))
-		entry.Img = fmt.Sprintf("http://ddragon.leagueoflegends.com/cdn/4.9.1/img/champion/%s.png", strings.Replace(entry.Name, " ", "", -1))
+		// Shortname is the clean_name with spaces replaced with underscores (internally defined).
+		entry.Shortname = strings.ToLower(strings.Replace(clean_name, " ", "_", -1))
+		// Img path is the clean_name with spaces removed (defined by Riot).
+		entry.Img = fmt.Sprintf("http://ddragon.leagueoflegends.com/cdn/4.9.1/img/champion/%s.png", strings.Replace(clean_name, " ", "", -1))
 		entry.Games = uint32(len(pcgl.Champions[champ].Winning) + len(pcgl.Champions[champ].Losing))
 
-		output = append(output, entry)
+		outjson.Champions = append(outjson.Champions, entry)
 	}
 
-	data, _ := json.Marshal(output)
+	data, _ := json.Marshal(outjson)
 	ioutil.WriteFile(filename, data, 0644)
 	log.Println(fmt.Sprintf("Written static champion file to %s", filename))
 }
@@ -167,12 +185,6 @@ func main() {
 		}
 
 		pcgl.All = append(pcgl.All, libcleo.GameId(*game.GameId))
-
-		// TODO: remove this.
-		if current == 100000 {
-			break
-		}
-
 		current += 1
 	}
 
@@ -211,5 +223,5 @@ func main() {
 		log.Println(fmt.Sprintf("Successfully wrote %d records to all.pcgl.", len(packed_pcgl.All)))
 	}
 
-	write_statics("html/static/data/championList.json", pcgl)
+	write_statics("html/static/data/metadata.json", pcgl)
 }

@@ -29,8 +29,12 @@
 	// Controller for the full app. Keeps track of state that's useful
 	// in many places but not directly displayed anywhere.
 	app.controller("AppController", function($scope, $http) {		
-		$http.get("static/data/championList.json").success(function(data) {
-			$scope.championList = data;
+		$http.get("static/data/metadata.json").success(function(data) {
+			// Angular wants milliseconds, JSON is providing seconds.
+			$scope.lastUpdated = data.lastUpdated * 1000; 
+			$scope.numGames = formatNumber(data.numGames);
+			$scope.championList = data.champions;
+			
 			console.log("Champions loaded.")
 
 			var championSet = new Bloodhound({
@@ -111,14 +115,12 @@
 		// updated. Whenever they're updated we should fire a request to
 		// fetch new stats for the newly defined teams.
 		$scope.$on('teamUpdate', function(data) {
-			console.log("Making new data request.");
-			console.log(teams);
-			
 			var ally_names = teams.allies.map(function(champ) { return champ.shortname; })
 			var enemy_names = teams.enemies.map(function(champ) { return champ.shortname; })
 			
 			// Retrieve some sample data and format it to be easier to read.
 			$http.get("team/?allies=" + ally_names + "&enemies=" + enemy_names).success(function(data) {
+				// TODO: check .successful status of query and handle failed cases better.
 				$scope.stats = data;
 
 				$scope.stats.percent = Math.round( ($scope.stats.matching / $scope.stats.available) * 1000 ) / 10;
