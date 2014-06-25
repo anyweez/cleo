@@ -27,4 +27,11 @@ message QueryResponse {
 	
 	// Marks whether the query completed successfully.
 	optional bool successful = 4;
+
+	message Benchmark {
+		optional uint32 segment = 1;
+		optional double timing = 2;
+	}
+	
+	repeated Benchmark timing = 5;
 }

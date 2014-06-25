@@ -153,8 +153,8 @@ func main() {
 func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, output chan query.GameQueryResponse, qm *query.QueryManager) {
 	for {
 		request := <-input
+				
 		log.Println(fmt.Sprintf("%s: handling query", request.Id))
-
 		// Eligible gamelist contains all games that match, irrespective of team.
 		log.Println(fmt.Sprintf("%s: copying data", request.Id))
 
@@ -166,12 +166,11 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 		// Matching gamelist contains all games that match, respective of team.
 		matching_gamelist := list.New()
 		
-		for _, x := range pcgl.All {
-			eligible_wins_gamelist.PushBack(x)
-			eligible_losses_gamelist.PushBack(x)
-			matching_gamelist.PushBack(x)
-		}
-
+		// Keep track of which lists have been initialized and which haven't.
+		mgl_initialized := false
+		ewgl_initialized := false
+		elgl_initialized := false
+		
 		// Get every game that all of the Winner champions won.
 		// Get every game that all of the Winner champions lost.
 		// Counting winners only, ratio is: won / (won + lost)
@@ -179,9 +178,22 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 		if len(request.Query.Winners) > 0 {
 			// Merge all game ID's, first matching the winning parameters.
 			for _, champion := range request.Query.Winners {
-				// Update the matching gamelist to include just the overlap between these two lists.
-				overlap(matching_gamelist, pcgl.Champions[champion].Winning)
-				overlap(eligible_losses_gamelist, pcgl.Champions[champion].Losing)
+				// Either initialize the matching game list or measure the
+				// overlap if its already been initialized.
+				if !mgl_initialized {
+					mgl_initialized = initialize(matching_gamelist, pcgl.Champions[champion].Winning)
+				} else {
+					// Update the matching gamelist to include just the overlap between these two lists.
+					overlap(matching_gamelist, pcgl.Champions[champion].Winning)
+				}
+
+				// Either initialize the eligible losses game list or measure
+				// the overlap if its already been initialized.
+				if !elgl_initialized {
+					elgl_initialized = initialize(eligible_losses_gamelist, pcgl.Champions[champion].Losing)
+				} else {
+					overlap(eligible_losses_gamelist, pcgl.Champions[champion].Losing)
+				}
 			}
 		} else {
 			eligible_losses_gamelist.Init()
@@ -194,14 +206,22 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 		// Then match all losers.
 		if len(request.Query.Losers) > 0 {
 			for _, champion := range request.Query.Losers {
-				overlap(matching_gamelist, pcgl.Champions[champion].Losing)
-				overlap(eligible_wins_gamelist, pcgl.Champions[champion].Winning)
+				if !mgl_initialized {
+					mgl_initialized = initialize(matching_gamelist, pcgl.Champions[champion].Losing)
+				} else {
+					overlap(matching_gamelist, pcgl.Champions[champion].Losing)
+				}
+
+				if !ewgl_initialized {
+					ewgl_initialized = initialize(eligible_wins_gamelist, pcgl.Champions[champion].Winning)
+				} else {
+					overlap(eligible_wins_gamelist, pcgl.Champions[champion].Winning)					
+				}
 			}
 		} else {
 			eligible_wins_gamelist.Init()
-			
-			// If no Winners or Losers were provided, clear everything.
-			if matching_gamelist.Len() == len(pcgl.All) {
+
+			if !mgl_initialized {
 				matching_gamelist.Init()
 			}
 		}
@@ -217,7 +237,7 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 		eligible_gamelist = merge(matching_gamelist, eligible_gamelist)
 
 		// Prepare the response.
-		response := query.GameQueryResponse{}
+		response := query.GameQueryResponse{}		
 		response.Request = &request
 
 		response.Response = &proto.QueryResponse{
@@ -232,6 +252,14 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 		// actual transmission and associated events.
 		qm.Respond(&response)
 	}
+}
+
+func initialize(dest *list.List, src []libcleo.GameId) bool {
+	for _, x := range src {
+		dest.PushBack(x)
+	}	
+	
+	return true
 }
 
 // Overlap accepts two lists of uints and reduces FIRST to the overlap
