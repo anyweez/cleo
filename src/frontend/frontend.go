@@ -14,6 +14,7 @@ import (
 	"proto"
 	"query"
 	"strings"
+	"switchboard"
 )
 
 type ChampionPageParam struct {
@@ -37,6 +38,10 @@ type PageParams struct {
 
 // TODO: this probably shouldn't be a global.
 var query_id = 0
+
+// TODO: figure out how to pass this to function handler in a way that will be
+// 	maintained between connections.
+var switchb = switchboard.SwitchboardClient{} //, _ = switchboard.NewClient("tcp", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 14002})
 
 // Fetch index.html (the main app). Simple, static file.
 func index_handler(w http.ResponseWriter, r *http.Request) {
@@ -125,10 +130,9 @@ func form_request(allies []string, enemies []string) proto.GameQuery {
 }
 
 func request(qry proto.GameQuery) proto.QueryResponse {
-	//  Socket to talk to server
-	log.Println(fmt.Sprintf("%s: connecting to cleo server...", query.GetQueryId(qry)))
-	conn, cerr := net.DialTCP("tcp", nil, &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 14002})
-
+	//  Get a switchboard socket to talk to server
+	conn, cerr := switchb.GetStream()
+	
 	if cerr != nil {
 		log.Println(fmt.Sprintf("%s: couldn't connect to a Cleo server.", query.GetQueryId(qry)))
 		return proto.QueryResponse{Successful: gproto.Bool(false)}
@@ -138,7 +142,7 @@ func request(qry proto.GameQuery) proto.QueryResponse {
 	data, _ := gproto.Marshal(&qry)
 	log.Println(fmt.Sprintf("%s: query sent", query.GetQueryId(qry)))
 
-	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
+	rw := bufio.NewReadWriter(bufio.NewReader(*conn), bufio.NewWriter(*conn))
 	rw.WriteString(string(data) + "|")
 	rw.Flush()
 
@@ -147,6 +151,13 @@ func request(qry proto.GameQuery) proto.QueryResponse {
 	log.Println(fmt.Sprintf("%s: awaiting response...", query.GetQueryId(qry)))
 
 	reply, _ := rw.ReadString('|')
+	
+	// If we get a zero-length reply this means the backend crashed. Don't
+	//  freak out. We got this.
+	if len(reply) == 0 {
+		return response
+	}
+	
 	gproto.Unmarshal([]byte(reply[:len(reply)-1]), &response)
 	log.Println(fmt.Sprintf("%s: valid response received", query.GetQueryId(qry)))
 
@@ -156,6 +167,14 @@ func request(qry proto.GameQuery) proto.QueryResponse {
 func main() {
 	http.HandleFunc("/", index_handler)
 	http.HandleFunc("/team/", simple_team)
+	
+	// Initialize the connection to 
+	cerr := error(nil)
+	switchb, cerr = switchboard.NewClient("tcp", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 14002})
+
+	if cerr != nil {
+		log.Fatal("Couldn't find any available backends.")
+	}
 
 	// Serve any files in static/ directly from the filesystem.
 	http.HandleFunc("/static/", func(w http.ResponseWriter, r *http.Request) {

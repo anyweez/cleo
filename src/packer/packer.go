@@ -22,6 +22,7 @@ import (
 )
 
 var API_KEY = flag.String("apikey", "", "Riot API key")
+var RECORD_COUNT = flag.Int("records", 0, "Maximum number of records retrieved")
 
 /**
  * StaticRequestInfo defines the data that should be extracted from the
@@ -185,6 +186,13 @@ func main() {
 		}
 
 		pcgl.All = append(pcgl.All, libcleo.GameId(*game.GameId))
+
+		// Optional: once RECORD_COUNT records have been written, stop writing more. If this value
+		// isn't provided then it defaults to zero, which will never be hit in this loop.
+		if current == *RECORD_COUNT {
+			break
+		}
+
 		current += 1
 	}
 
