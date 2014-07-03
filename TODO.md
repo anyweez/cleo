@@ -2,6 +2,7 @@ Features
 =========
 * Send a simultaneous request for each champion to determine best team comps.
 * Merge requests and sort in frontend.
+* Lots and lots of logging.
 
 Bugs
 =====

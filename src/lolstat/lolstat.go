@@ -241,10 +241,12 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 		response.Request = &request
 
 		response.Response = &proto.QueryResponse{
-			Available:  gproto.Uint32( uint32(eligible_gamelist.Len()) ),
-			Matching:   gproto.Uint32( uint32(matching_gamelist.Len()) ),
-			Total:      gproto.Uint32( uint32(len(pcgl.All)) ),
 			Successful: gproto.Bool(true),
+			Results: &proto.QueryResponse_Results {
+				Available:  gproto.Uint32( uint32(eligible_gamelist.Len()) ),
+				Matching:   gproto.Uint32( uint32(matching_gamelist.Len()) ),
+				Total:      gproto.Uint32( uint32(len(pcgl.All)) ),
+			},
 		}
 
 		log.Println(fmt.Sprintf("%s: response generated", request.Id))

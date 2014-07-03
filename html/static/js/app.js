@@ -123,10 +123,10 @@
 				// TODO: check .successful status of query and handle failed cases better.
 				$scope.stats = data;
 
-				$scope.stats.percent = Math.round( ($scope.stats.matching / $scope.stats.available) * 1000 ) / 10;
-				$scope.stats.matching = formatNumber($scope.stats.matching)
-				$scope.stats.available = formatNumber($scope.stats.available)
-				$scope.stats.total = formatNumber($scope.stats.total)
+				$scope.stats.results.percent = Math.round( ($scope.stats.results.matching / $scope.stats.results.available) * 1000 ) / 10;
+				$scope.stats.results.matching = formatNumber($scope.stats.results.matching)
+				$scope.stats.results.available = formatNumber($scope.stats.results.available)
+				$scope.stats.results.total = formatNumber($scope.stats.results.total)
 			});
 		});
 	});

@@ -244,8 +244,8 @@
       <div ng-hide="stats">Specify allied and enemy teams on the left to get started.</div>  
 	  <div ng-show="stats">
 	  <div>
-        <p>Probability of success: {{ stats.percent }}%</p>
-        <p>These teams were found in <b>{{ stats.available }}</b> of the <b>{{ stats.total }}</b> known games, and won <b>{{ stats.matching }}</b> of them.</p> 
+        <p>Probability of success: {{ stats.results.percent }}%</p>
+        <p>These teams were found in <b>{{ stats.results.available }}</b> of the <b>{{ stats.results.total }}</b> known games, and won <b>{{ stats.results.matching }}</b> of them.</p> 
         <div class="team_stats">
           <h3>Allies: best additions</h3>
           <p style="font-style: italic;">not built yet</p>

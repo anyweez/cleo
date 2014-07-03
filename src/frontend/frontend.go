@@ -36,6 +36,13 @@ type PageParams struct {
 	Valid bool
 }
 
+type SubqueryBundle struct {
+	Explorer	int32
+	Response	proto.QueryResponse
+}
+
+const ENABLE_EXPLORATORY_SUBQUERIES = true
+
 // TODO: this probably shouldn't be a global.
 var query_id = 0
 
@@ -73,6 +80,33 @@ func simple_team(w http.ResponseWriter, r *http.Request) {
 	if is_valid {
 		log.Println(fmt.Sprintf("%s: valid team query [allies=;enemies=]", query.GetQueryId(qry)))
 		response = request(qry)
+		
+		if ENABLE_EXPLORATORY_SUBQUERIES {
+			log.Println(fmt.Sprintf("%s: submitting subqueries", query.GetQueryId(qry)))
+			
+			subqueries := make(chan SubqueryBundle)
+			num_subqueries := 0
+			
+			// Launch a bunch of different subqueries.
+			for _, cid := range proto.ChampionType_value {
+				go explore_subquery(qry, cid, subqueries)
+				num_subqueries += 1
+			}
+			
+			// Collect all of the subquery responses.
+			for i := 0; i < num_subqueries; i++ {
+				bundle := <- subqueries
+				
+				next_champ := proto.QueryResponse_ExploratoryChampionSubquery {
+					Explorer: proto.ChampionType(bundle.Explorer),
+					Results: bundle.Results,
+					Valid: (bundle.Response != nil),
+				}
+					
+				response.NextChamp = append(response.NextChamp, next_champ)
+			}
+		}
+
 		data, err := json.Marshal(response)
 
 		if err != nil {
@@ -85,6 +119,39 @@ func simple_team(w http.ResponseWriter, r *http.Request) {
 		log.Println(w, "SimpleTeam: invalid query.")
 	}
 }
+
+/**
+ * This function issues another modified query to the backend that includes
+ * an explorer ID (champion ID) that was not specified by the user. This
+ * will compute all of the standard stats if the user were to add this
+ * champion.
+ */
+func explore_subquery(qry proto.GameQuery, explorer_id int32, out chan SubqueryBundle) {
+	qry.Winners = append(qry.Winners, explorer_id)
+	
+	// If the query is valid, submit it and pass the response back to the
+	// output channel.
+	if validate_request(qry) {
+		response := request(qry)
+		
+		bundle_response := SubqueryBundle {
+			Explorer: explorer_id,
+			Response: response,
+		}	
+		
+		out <- bundle_response
+	// If it's not a valid query we should return a nil response so that
+	// we can still aggregate everything appropriately.
+	} else {
+		bundle_response := SubqueryBundle {
+			Explorer: explorer_id,
+			Response: nil,
+		}
+		
+		out <- bundle_response
+	}
+}
+
 
 // Validate current just checks to make sure that all tokens are real.
 func validate_request(qry proto.GameQuery) bool {
