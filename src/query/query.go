@@ -71,9 +71,16 @@ func (q *QueryManager) Await() GameQueryRequest {
 	gqr.Id = GetQueryId(qry)
 	gqr.Query = &qry
 
-	for _, q := range qry.Winners {
-		log.Println(fmt.Sprintf("%s: requires champion %s", gqr.Id, q))
+	// Print out the included champions for debugging purposes.
+	champ_str := "allies="
+	for _, ch := range qry.Winners {
+		champ_str += ch.String() + ","
 	}
+	champ_str += " enemies="
+	for _, ch := range qry.Losers {
+		champ_str += ch.String() + ","
+	}
+	log.Println(fmt.Sprintf("%s: requires champion %s", gqr.Id, champ_str))
 
 	// Increment the query counter.
 	q.ActiveCount += 1

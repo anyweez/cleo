@@ -37,8 +37,8 @@ type PageParams struct {
 }
 
 type SubqueryBundle struct {
-	Explorer	int32
-	Response	proto.QueryResponse
+	Explorer	proto.ChampionType
+	Response	*proto.QueryResponse
 }
 
 const ENABLE_EXPLORATORY_SUBQUERIES = true
@@ -61,6 +61,22 @@ func index_handler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.Write(data)
 	}
+}
+
+func tmp_copy(old proto.GameQuery) proto.GameQuery {
+	newq := proto.GameQuery {
+		QueryProcess: old.QueryProcess,
+		QueryId: old.QueryId,
+	}
+	
+	for _, win := range old.Winners {
+		newq.Winners = append(newq.Winners, win)
+	}
+	for _, lose := range old.Losers {
+		newq.Losers = append(newq.Losers, lose)
+	}
+	
+	return newq
 }
 
 /**
@@ -89,21 +105,31 @@ func simple_team(w http.ResponseWriter, r *http.Request) {
 			
 			// Launch a bunch of different subqueries.
 			for _, cid := range proto.ChampionType_value {
-				go explore_subquery(qry, cid, subqueries)
+				go explore_subquery(tmp_copy(qry), cid, subqueries)
 				num_subqueries += 1
 			}
-			
+			log.Println(fmt.Sprintf("Generated %d subqueries", num_subqueries))
+
 			// Collect all of the subquery responses.
 			for i := 0; i < num_subqueries; i++ {
+				log.Println(fmt.Sprintf("Awaiting subquery responses [%d / %d]", i+1, num_subqueries))
 				bundle := <- subqueries
+	
+				log.Println(bundle.Explorer)
 				
-				next_champ := proto.QueryResponse_ExploratoryChampionSubquery {
-					Explorer: proto.ChampionType(bundle.Explorer),
-					Results: bundle.Results,
-					Valid: (bundle.Response != nil),
+				if bundle.Response != nil {
+					subq := proto.QueryResponse_ExploratoryChampionSubquery {
+						Explorer: &bundle.Explorer,
+						Results: bundle.Response.Results,
+						Valid: gproto.Bool(true),
+					}
+				
+					response.NextChamp = append(response.NextChamp, &subq)
+				} else {
+					log.Println("nil subquery response")
 				}
-					
-				response.NextChamp = append(response.NextChamp, next_champ)
+				
+				log.Println(fmt.Sprintf("Responses for %d / %d", i+1, num_subqueries))
 			}
 		}
 
@@ -115,6 +141,7 @@ func simple_team(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Write(data)
+		log.Println( fmt.Sprintf("%s: request complete.", query.GetQueryId(qry)) )
 	} else {
 		log.Println(w, "SimpleTeam: invalid query.")
 	}
@@ -127,24 +154,28 @@ func simple_team(w http.ResponseWriter, r *http.Request) {
  * champion.
  */
 func explore_subquery(qry proto.GameQuery, explorer_id int32, out chan SubqueryBundle) {
-	qry.Winners = append(qry.Winners, explorer_id)
+	log.Println("Explore with " + proto.ChampionType(explorer_id).String() )
+	qry.Winners = append( qry.Winners, proto.ChampionType(explorer_id) )
 	
 	// If the query is valid, submit it and pass the response back to the
 	// output channel.
 	if validate_request(qry) {
 		response := request(qry)
 		
+		log.Println("Subquery exploration complete for "  + proto.ChampionType(explorer_id).String())
+		
 		bundle_response := SubqueryBundle {
-			Explorer: explorer_id,
-			Response: response,
+			Explorer: proto.ChampionType(explorer_id),
+			Response: &response,
 		}	
 		
 		out <- bundle_response
+		log.Println("Sending response to output channel for "  + proto.ChampionType(explorer_id).String())
 	// If it's not a valid query we should return a nil response so that
 	// we can still aggregate everything appropriately.
 	} else {
 		bundle_response := SubqueryBundle {
-			Explorer: explorer_id,
+			Explorer: proto.ChampionType(explorer_id),
 			Response: nil,
 		}
 		
@@ -166,6 +197,9 @@ func validate_request(qry proto.GameQuery) bool {
 			return false
 		}
 	}
+	
+	// TODO: if more than 5 winners or losers are provided, mark as invalid.
+	// TODO: if team contains the same champion more than one, mark as invalid.
 
 	return true
 }
