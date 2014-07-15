@@ -247,11 +247,17 @@
         <p>Probability of success: {{ stats.results.percent }}%</p>
         <p>These teams were found in <b>{{ stats.results.available }}</b> of the <b>{{ stats.results.total }}</b> known games, and won <b>{{ stats.results.matching }}</b> of them.</p> 
         <div class="team_stats">
-          <h3>Allies: best additions</h3>
-          <p style="font-style: italic;">not built yet</p>
+          <h2>Allies: best additions</h2>
+            <div class="allied_champion" ng-repeat="ally in allies">
+              <img class="champ_img" src="{{ ally.champion.img }}" />
+              <div style="display: inline-block; vertical-align: top">
+                <p style="margin: 2px">{{ ally.champion.name }}</p>
+                <p style="margin: 2px; font-style: italic">{{ ally.results.percent }}% win rate ({{ ally.results.matching }} / {{ ally.results.available }})</p>
+              </div>
+            </div>
         </div>
         <div class="team_stats">
-          <h3>Enemies: best additions</h3>
+          <h2>Enemies: best additions</h2>
           <p style="font-style: italic;">not built yet</p>
         </div>
       </div>
