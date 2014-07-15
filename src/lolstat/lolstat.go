@@ -154,9 +154,9 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 	for {
 		request := <-input
 				
-//		log.Println(fmt.Sprintf("%s: handling query", request.Id))
+		log.Println(fmt.Sprintf("%s: handling query", request.Id))
 		// Eligible gamelist contains all games that match, irrespective of team.
-//		log.Println(fmt.Sprintf("%s: copying data", request.Id))
+		log.Println(fmt.Sprintf("%s: copying data", request.Id))
 
 		// TODO: this can be done asynchronously pretty easily.
 		eligible_wins_gamelist := list.New() 
@@ -174,7 +174,7 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 		// Get every game that all of the Winner champions won.
 		// Get every game that all of the Winner champions lost.
 		// Counting winners only, ratio is: won / (won + lost)
-//		log.Println(fmt.Sprintf("%s: winning overlap", request.Id))
+		log.Println(fmt.Sprintf("%s: winning overlap", request.Id))
 		if len(request.Query.Winners) > 0 {
 			// Merge all game ID's, first matching the winning parameters.
 			for _, champion := range request.Query.Winners {
@@ -202,7 +202,7 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 		// If losers are specified we need to consider them as well.
 		// Get every game that all of the games that all Losers lost.
 		// Get every game that all of the games that all Losers won.
-//		log.Println(fmt.Sprintf("%s: losing overlap data", request.Id))
+		log.Println(fmt.Sprintf("%s: losing overlap data", request.Id))
 		// Then match all losers.
 		if len(request.Query.Losers) > 0 {
 			for _, champion := range request.Query.Losers {
@@ -232,7 +232,7 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 
 		// Step #2: Eligible set includes all that matched and all those that contained
 		//   the proposed champions in the teams provided (victory status ignored).
-//		log.Println(fmt.Sprintf("%s: merging", request.Id))
+		log.Println(fmt.Sprintf("%s: merging", request.Id))
 		eligible_gamelist := merge(eligible_wins_gamelist, eligible_losses_gamelist)
 		eligible_gamelist = merge(matching_gamelist, eligible_gamelist)
 
@@ -249,7 +249,7 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 			},
 		}
 
-//		log.Println(fmt.Sprintf("%s: response generated", request.Id))
+		log.Println(fmt.Sprintf("%s: response generated", request.Id))
 		// Send it to the query responder queue to take care of the
 		// actual transmission and associated events.
 		qm.Respond(&response)
@@ -285,7 +285,7 @@ func overlap(first *list.List, second []libcleo.GameId) {
 		// equal to the primary array. We should not reset this counter
 		// variable.
 		for second[parallel_counter] < (*item).Value.(libcleo.GameId) {
-			if parallel_counter + 1 < len(second) {
+			if parallel_counter+1 < len(second) {
 				parallel_counter += 1
 			} else {
 				// If parallel_counter is as big as it can get then none of
