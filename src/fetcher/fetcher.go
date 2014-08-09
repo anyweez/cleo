@@ -203,7 +203,7 @@ func main() {
 // Note that all rate limiting is handled directly by the channel, meaning
 // that everything in this goroutine can execute as quickly as possible.
 func retrieve(summoner uint32, collection *mgo.Collection, cm *CandidateManager) {
-	url := "https://prod.api.pvp.net/api/lol/na/v1.3/game/by-summoner/%d/recent?api_key=%s"
+	url := "https://na.api.pvp.net/api/lol/na/v1.3/game/by-summoner/%d/recent?api_key=%s"
 
 	resp, err := http.Get(fmt.Sprintf(url, summoner, *API_KEY))
 	if err != nil {
