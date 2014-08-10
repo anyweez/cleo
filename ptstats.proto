@@ -1,0 +1,27 @@
+package proto;
+
+import "gamelog.proto";
+
+message StatsValue {
+	optional string name = 1;
+	optional double absolute = 2;
+	optional uint32 normalized = 3;
+}
+
+message PlayerSnapshot {
+	optional uint64 timestamp = 1;
+	optional uint32 summoner_id = 2;
+	repeated GameRecord games = 3;
+	repeated StatsValue stats = 4;
+}
+
+message MetaSnapshot {
+	optional uint64 timestamp = 1;
+	repeated StatsValue stats = 2;
+}
+
+message MetaLeagueSnapshot {
+	optional uint64 timestamp = 1;
+	optional PlayerRank league = 2;
+	repeated StatsValue stats = 3;
+}
