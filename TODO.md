@@ -1,12 +1,12 @@
 Features
 =========
-* Send a simultaneous request for each champion to determine best team comps.
-* Merge requests and sort in frontend.
+* [X] Send a simultaneous request for each champion to determine best team comps.
+* [X] Merge requests and sort in frontend.
 * Lots and lots of logging.
 
 Bugs
 =====
-* index needs to submit a request on autocomplete onclick
+* Frontend app needs to submit a request on autocomplete onclick
 * Seems to be incorrect results coming back from lolstat.
 
 Testing

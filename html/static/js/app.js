@@ -1,3 +1,27 @@
+/*
+ * Assumes that game_array is sorted.
+ */
+function top_x(game_array, x) {
+	return game_array.slice(0, x)
+}
+
+function sort_games(game_array) {
+	game_array.sort(function(a, b) { return b.results.percent - a.results.percent });
+
+	return game_array
+}
+
+function filter_on_available(game_array, min_count) {
+	var filtered = [];
+	
+	for (i = 0; i < game_array.length; i++) {
+		if (game_array[i].results.available >= min_count) {
+			filtered.push(game_array[i]);
+		}
+	}
+	
+	return filtered;
+}
 
 (function() {
 	var app = angular.module("lolstatApp", []);
@@ -122,7 +146,26 @@
 			$http.get("team/?allies=" + ally_names + "&enemies=" + enemy_names).success(function(data) {
 				// TODO: check .successful status of query and handle failed cases better.
 				$scope.stats = data;
-
+				
+				for (i = 0; i < $scope.stats.next_champ.length; i++) {
+					results = $scope.stats.next_champ[i].results
+					$scope.stats.next_champ[i].results.percent = Math.round( (results.matching / results.available) * 1000 ) / 10;
+				}
+				
+				allies = top_x( sort_games( filter_on_available(data.next_champ, 5) ), 8 )
+				$scope.allies = []
+				
+				// Attach champion data to each allie record.
+				for (i = 0; i < allies.length; i++) {
+					// Find out who the explorer_id identifies and store their data.
+					for (j = 0; j < $scope.championList.length; j++) {
+						if ($scope.championList[j].id == allies[i].explorer) {
+							allies[i].champion = $scope.championList[j];
+							$scope.allies.push(allies[i])
+						}
+					}
+				}
+				
 				$scope.stats.results.percent = Math.round( ($scope.stats.results.matching / $scope.stats.results.available) * 1000 ) / 10;
 				$scope.stats.results.matching = formatNumber($scope.stats.results.matching)
 				$scope.stats.results.available = formatNumber($scope.stats.results.available)
