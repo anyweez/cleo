@@ -2,6 +2,15 @@ package proto;
 
 import "champions.proto";
 
+enum LeagueType {
+	BRONZE 		= 0;
+	SILVER 		= 1;
+	GOLD 		= 2;
+	PLATINUM 	= 3;
+	DIAMOND		= 4;
+}
+
+
 // ChampionGameList's are imported into lolstat for searching. These
 // are optimized for determining overlap between multiple champions' 
 // game lists. All game ID's are in increasing order.
@@ -34,15 +43,7 @@ message GameRecord {
 
 
 // The league that the player was in at the time the games were sampled.
-message PlayerRank {
-	enum LeagueType {
-		BRONZE 		= 0;
-		SILVER 		= 1;
-		GOLD 		= 2;
-		PLATINUM 	= 3;
-		DIAMOND		= 4;
-	}
-	
+message PlayerRank {	
 	optional uint32 level = 1;
 	optional LeagueType league = 2;
 }
