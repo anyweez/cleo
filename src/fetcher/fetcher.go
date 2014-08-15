@@ -2,19 +2,17 @@ package main
 
 import (
 	"bufio"
-	gproto "code.google.com/p/goprotobuf/proto"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"gamelog"
 	"io"
 	"io/ioutil"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
-	"libcleo"
 	"log"
 	"net/http"
 	"os"
-	gamelog "proto"
 	"runtime/pprof"
 	"strconv"
 	"strings"
@@ -29,36 +27,6 @@ const STORE_RESPONSES = true
 // Flags
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 var memprofile = flag.String("memprofile", "", "write memory profile to this file")
-
-type JSONResponse struct {
-	Games      []JSONGameResponse `json:"games"`
-	SummonerId uint32
-}
-
-type JSONGameResponse struct {
-	FellowPlayers []JSONPlayerResponse
-	Stats         JSONGameStatsResponse
-
-	GameId     uint64
-	CreateDate uint64
-
-	TeamId     uint32
-	ChampionId uint32
-
-	GameMode    string
-	GameType    string
-	GameSubType string
-}
-
-type JSONGameStatsResponse struct {
-	Win bool
-}
-
-type JSONPlayerResponse struct {
-	SummonerId uint32
-	TeamId     uint32
-	ChampionId uint32
-}
 
 //////////////////////////////////////////////////////////////////
 //// CandidateManager keeps track of a list of Players that can be fetched
@@ -164,7 +132,7 @@ func main() {
 	for {
 		// Wait for 1.20 seconds to account for the rate limiting that
 		// Riot requires.
-		time.Sleep(1200 * time.Millisecond)
+		time.Sleep(1100 * time.Millisecond)
 
 		// Push the player to the retrieval queue.
 		go retrieve(cm.Next(), games_collection, &cm)
@@ -203,16 +171,17 @@ func main() {
 // Note that all rate limiting is handled directly by the channel, meaning
 // that everything in this goroutine can execute as quickly as possible.
 func retrieve(summoner uint32, collection *mgo.Collection, cm *CandidateManager) {
+	// Retrieve game data.
 	url := "https://na.api.pvp.net/api/lol/na/v1.3/game/by-summoner/%d/recent?api_key=%s"
-
 	resp, err := http.Get(fmt.Sprintf(url, summoner, *API_KEY))
+	json_response := JSONResponse{}
+
 	if err != nil {
 		log.Println("Error retrieving data:", err)
 	} else {
 		defer resp.Body.Close()
 		body, _ := ioutil.ReadAll(resp.Body)
 
-		json_response := JSONResponse{}
 		json.Unmarshal(body, &json_response)
 
 		// Write all games into permanent storage.
@@ -221,22 +190,51 @@ func retrieve(summoner uint32, collection *mgo.Collection, cm *CandidateManager)
 			// takes care of removing duplicates automatically.
 			for _, team := range game.Teams {
 				for _, player := range team.Players {
-					cm.Add(*player.Player.SummonerId)
+					cm.Add(player.Player.SummonerId)
 				}
 			}
 
-			if STORE_RESPONSES {
-				// Check to see if the game already exists. If so, don't do anything.
-				record_count, _ := collection.Find(bson.M{"gameid": *game.GameId}).Count()
+			// Store everything per game
+        		if STORE_RESPONSES {
+                		// Check to see if the game already exists. If so, don't do anything.
+                		record_count, _ := collection.Find(bson.M{"_id": game.GameId}).Count()
 
-				if record_count == 0 {
-					// Encode and store in the database.
-					encoded_gamedata, _ := gproto.Marshal(&game)
-					record := libcleo.RecordContainer{encoded_gamedata, *game.GameId, *game.Timestamp}
+				// Insert a new record.
+                		if record_count == 0 {
+        	        	       	// Encode and store in the database.
+	                	        collection.Insert(game)
+                		} else {
+					// Otherwise merge with a pre-existing record.
+					// TODO: add a lock to make sure the response we retrieve doesn't go stale before we
+					//   update it.
+					record := gamelog.GameRecord{}
+					collection.Find(bson.M{"_id": game.GameId}).One(&record)
+
+					// A ridiculously nested loop that compares players in the stored game record with
+					// players from the new record and merges them if it finds overlap (should be exactly
+					// one player). The found_player variable is used to confirm that only one player
+					// is updated.
+					found_target := 0
+					for i, recorded_team := range record.Teams {
+						for j, recorded_player := range recorded_team.Players {
+							for k, incoming_team := range game.Teams {
+								for m, incoming_player := range incoming_team.Players {
+									if recorded_player.Player.SummonerId == incoming_player.Player.SummonerId {
+										record.Teams[i].Players[j] = game.Teams[k].Players[m]
+										found_target += 1
+									}
+								}
+							}	
+						}
+					}
+
+					if found_target != 1 {
+						log.Println("Found matching game ID's with non-matching summoner ID's.")
+					}
 
 					collection.Insert(record)
 				}
-			}
+        		}
 		} // end for
 	}
 }
@@ -257,41 +255,49 @@ func convert(response *JSONResponse) []gamelog.GameRecord {
 
 		record := gamelog.GameRecord{}
 
-		record.Timestamp = gproto.Uint64(game.CreateDate)
-		record.GameId = gproto.Uint64(game.GameId)
+		record.Timestamp = game.CreateDate
+		record.GameId = game.GameId
 
 		team1 := gamelog.Team{}
 		team2 := gamelog.Team{}
 
 		// Add the target player and set the outcome.
-		plyr := gamelog.Player{}
-		plyr.SummonerId = gproto.Uint32(response.SummonerId)
+		plyr := gamelog.PlayerType{}
+		plyr.SummonerId = response.SummonerId
 
 		pstats := gamelog.PlayerStats{}
-		pstats.Champion = libcleo.Rid2Cleo(game.ChampionId).Enum()
+		pstats.Champion = game.ChampionId
 		pstats.Player = &plyr
 
 		if game.TeamId == 100 {
 			team1.Players = append(team1.Players, &pstats)
 
-			team1.Victory = gproto.Bool(game.Stats.Win)
-			team2.Victory = gproto.Bool(!game.Stats.Win)
+			team1.Victory = game.Stats.Win
+			team2.Victory = !game.Stats.Win
 		} else if game.TeamId == 200 {
 			team2.Players = append(team2.Players, &pstats)
 
-			team1.Victory = gproto.Bool(!game.Stats.Win)
-			team2.Victory = gproto.Bool(game.Stats.Win)
+			team1.Victory = !game.Stats.Win
+			team2.Victory = game.Stats.Win
 		} else {
 			log.Println("Unknown team ID found on game", game.GameId)
 		}
 
-		// Add all fellow players.
+		// Populate stats fields.
+		pstats.Kills = game.Stats.ChampionsKilled
+		pstats.Deaths = game.Stats.NumDeaths 
+		pstats.Assists = game.Stats.Assists
+		pstats.GoldEarned = game.Stats.GoldEarned 
+		pstats.Minions = game.Stats.MinionsKilled
+
+		// Add all fellow players. Note that we only get stats for the player that we're
+		// querying for.
 		for _, player := range game.FellowPlayers {
-			plyr := gamelog.Player{}
+			plyr := gamelog.PlayerType{}
 			pstats := gamelog.PlayerStats{}
 
-			plyr.SummonerId = gproto.Uint32(player.SummonerId)
-			pstats.Champion = libcleo.Rid2Cleo(player.ChampionId).Enum()
+			plyr.SummonerId = player.SummonerId
+			pstats.Champion = player.ChampionId
 
 			if player.TeamId == 100 {
 				pstats.Player = &plyr

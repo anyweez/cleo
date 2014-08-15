@@ -19,12 +19,14 @@ type LivePCGLRecord struct {
 	Losing  []GameId
 }
 
+/*
 // RecordContainer describes what a row in the MongoDB is composed of.
 type RecordContainer struct {
 	GameData  []byte
 	GameId    uint64		// 64-bit because it's used pre-packing.
 	Timestamp uint64
 }
+*/
 
 type GameId uint32
 
