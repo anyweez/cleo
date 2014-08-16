@@ -220,10 +220,9 @@ func retrieve(summoner uint32, collection *mgo.Collection, cm *CandidateManager)
 						for j, recorded_player := range recorded_team.Players {
 							for k, incoming_team := range game.Teams {
 								for m, incoming_player := range incoming_team.Players {
-									//									log.Println(fmt.Sprintf("%d vs %d = %b", recorded_player.Player.SummonerId, incoming_player.Player.SummonerId, recorded_player.Player.SummonerId == incoming_player.Player.SummonerId))
 									if recorded_player.Player.SummonerId == incoming_player.Player.SummonerId {
 										// Check to make sure the player actually has data to add.
-										if incoming_player.IsSet {
+										if incoming_player.IsSet && !recorded_player.IsSet {
 											record.Teams[i].Players[j] = game.Teams[k].Players[m]
 
 											found_target += 1
