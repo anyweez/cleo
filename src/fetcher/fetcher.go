@@ -195,12 +195,13 @@ func retrieve(summoner uint32, collection *mgo.Collection, cm *CandidateManager)
 			}
 
 			// Store everything per game
-        		if STORE_RESPONSES {
-                		// Check to see if the game already exists. If so, don't do anything.
+			if STORE_RESPONSES {
+				// Check to see if the game already exists. If so, don't do anything.
                 		record_count, _ := collection.Find(bson.M{"_id": game.GameId}).Count()
 
 				// Insert a new record.
                 		if record_count == 0 {
+					game.MergeCount = 1
         	        	       	// Encode and store in the database.
 	                	        collection.Insert(game)
                 		} else {
@@ -219,20 +220,28 @@ func retrieve(summoner uint32, collection *mgo.Collection, cm *CandidateManager)
 						for j, recorded_player := range recorded_team.Players {
 							for k, incoming_team := range game.Teams {
 								for m, incoming_player := range incoming_team.Players {
+//									log.Println(fmt.Sprintf("%d vs %d = %b", recorded_player.Player.SummonerId, incoming_player.Player.SummonerId, recorded_player.Player.SummonerId == incoming_player.Player.SummonerId))
 									if recorded_player.Player.SummonerId == incoming_player.Player.SummonerId {
-										record.Teams[i].Players[j] = game.Teams[k].Players[m]
-										found_target += 1
+										// Check to make sure the player actually has data to add.
+										if incoming_player.IsSet {
+											record.Teams[i].Players[j] = game.Teams[k].Players[m]
+
+											found_target += 1
+
+											// Increment the counter for the number of players that have
+											// been merged into this game record.
+											record.MergeCount += 1
+											collection.Update(bson.M{"_id": game.GameId},  record)
+										}
 									}
 								}
-							}	
+							}
 						}
 					}
 
-					if found_target != 1 {
+					if found_target == 0 {
 						log.Println("Found matching game ID's with non-matching summoner ID's.")
 					}
-
-					collection.Insert(record)
 				}
         		}
 		} // end for
@@ -269,6 +278,14 @@ func convert(response *JSONResponse) []gamelog.GameRecord {
 		pstats.Champion = game.ChampionId
 		pstats.Player = &plyr
 
+                // Populate stats fields.
+                pstats.Kills = game.Stats.ChampionsKilled
+                pstats.Deaths = game.Stats.NumDeaths
+                pstats.Assists = game.Stats.Assists
+                pstats.GoldEarned = game.Stats.GoldEarned
+                pstats.Minions = game.Stats.MinionsKilled
+                pstats.IsSet = true
+
 		if game.TeamId == 100 {
 			team1.Players = append(team1.Players, &pstats)
 
@@ -283,28 +300,22 @@ func convert(response *JSONResponse) []gamelog.GameRecord {
 			log.Println("Unknown team ID found on game", game.GameId)
 		}
 
-		// Populate stats fields.
-		pstats.Kills = game.Stats.ChampionsKilled
-		pstats.Deaths = game.Stats.NumDeaths 
-		pstats.Assists = game.Stats.Assists
-		pstats.GoldEarned = game.Stats.GoldEarned 
-		pstats.Minions = game.Stats.MinionsKilled
-
 		// Add all fellow players. Note that we only get stats for the player that we're
 		// querying for.
 		for _, player := range game.FellowPlayers {
 			plyr := gamelog.PlayerType{}
-			pstats := gamelog.PlayerStats{}
+			fellow_stats := gamelog.PlayerStats{}
 
 			plyr.SummonerId = player.SummonerId
-			pstats.Champion = player.ChampionId
+			fellow_stats.Champion = player.ChampionId
+			fellow_stats.IsSet = false
 
 			if player.TeamId == 100 {
-				pstats.Player = &plyr
-				team1.Players = append(team1.Players, &pstats)
+				fellow_stats.Player = &plyr
+				team1.Players = append(team1.Players, &fellow_stats)
 			} else if player.TeamId == 200 {
-				pstats.Player = &plyr
-				team2.Players = append(team2.Players, &pstats)
+				fellow_stats.Player = &plyr
+				team2.Players = append(team2.Players, &fellow_stats)
 			} else {
 				log.Println("Unknown team ID found on game", game.GameId)
 			}
