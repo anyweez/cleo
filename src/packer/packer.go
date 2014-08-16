@@ -48,9 +48,9 @@ type StaticEntry struct {
 }
 
 type StaticOutputJSON struct {
-	LastUpdated		int64			`json:"lastUpdated"`
-	NumGames		int				`json:"numGames"`
-	Champions		[]StaticEntry	`json:"champions"`
+	LastUpdated int64         `json:"lastUpdated"`
+	NumGames    int           `json:"numGames"`
+	Champions   []StaticEntry `json:"champions"`
 }
 
 /**
@@ -86,7 +86,7 @@ func write_statics(filename string, pcgl libcleo.LivePCGL) {
 	// Export the number of games in this pcgl export.
 	outjson.NumGames = len(pcgl.All)
 	outjson.LastUpdated = time.Now().Unix()
-	
+
 	outjson.Champions = make([]StaticEntry, 0, 200)
 	// Remove non-alphanumeric characters.
 	reg, _ := regexp.Compile("[^A-Za-z0-9 ]+")
@@ -153,10 +153,10 @@ func main() {
 		// at serving time until we get beyond 4B games. That's far away.
 		gid, exists := gid_map[*game.GameId]
 		if exists {
-			game.GameId = gproto.Uint64( uint64(gid) )
+			game.GameId = gproto.Uint64(uint64(gid))
 		} else {
 			gid_map[*game.GameId] = next_gid
-			game.GameId = gproto.Uint64( uint64(next_gid) )
+			game.GameId = gproto.Uint64(uint64(next_gid))
 
 			next_gid += 1
 		}

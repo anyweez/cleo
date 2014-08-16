@@ -11,11 +11,11 @@ import (
 )
 
 type GameQueryRequest struct {
-	Id    		string
-	Query 		*proto.GameQuery
+	Id    string
+	Query *proto.GameQuery
 
-	Identity   	string
-	Connection 	*net.Conn
+	Identity   string
+	Connection *net.Conn
 }
 
 type GameQueryResponse struct {
@@ -27,7 +27,7 @@ type QueryManager struct {
 	// Connection information.
 	ActiveCount uint32
 
-//	Listener *net.TCPListener
+	//	Listener *net.TCPListener
 	Switchboard switchboard.SwitchboardServer
 }
 
@@ -38,7 +38,7 @@ func GetQueryId(qry proto.GameQuery) string {
 func (q *QueryManager) Connect() {
 	q.ActiveCount = 0
 	cerr := error(nil)
-	
+
 	q.Switchboard, cerr = switchboard.NewServer("tcp", &net.TCPAddr{IP: net.IPv4zero, Port: 14002})
 
 	if cerr != nil {

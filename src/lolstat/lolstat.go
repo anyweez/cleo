@@ -11,8 +11,8 @@ package main
 // accessible at once.
 
 import (
-	"container/list"
 	gproto "code.google.com/p/goprotobuf/proto"
+	"container/list"
 	"fmt"
 	"io/ioutil"
 	"libcleo"
@@ -20,7 +20,7 @@ import (
 	"proto"
 	"query"
 	"sort"
-//	"time"
+	//	"time"
 )
 
 // Build a wrapper data structure that can be used to enable fast sorting
@@ -56,7 +56,7 @@ func get_sorted(x []uint32) []libcleo.GameId {
 	ids := make(idList, 0, len(x))
 
 	for _, val := range x {
-		ids = append( ids, libcleo.GameId(val) )
+		ids = append(ids, libcleo.GameId(val))
 	}
 	sort.Sort(ids)
 
@@ -122,7 +122,7 @@ func main() {
 	// once the time is right.
 	for {
 		query_requests <- qm.Await()
-//		time.Sleep(1 * time.Second)
+		//		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -153,24 +153,24 @@ func main() {
 func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, output chan query.GameQueryResponse, qm *query.QueryManager) {
 	for {
 		request := <-input
-				
+
 		log.Println(fmt.Sprintf("%s: handling query", request.Id))
 		// Eligible gamelist contains all games that match, irrespective of team.
 		log.Println(fmt.Sprintf("%s: copying data", request.Id))
 
 		// TODO: this can be done asynchronously pretty easily.
-		eligible_wins_gamelist := list.New() 
+		eligible_wins_gamelist := list.New()
 		// Eligible losses are games that the Winners could have won but
 		// didn't.
-		eligible_losses_gamelist := list.New() 
+		eligible_losses_gamelist := list.New()
 		// Matching gamelist contains all games that match, respective of team.
 		matching_gamelist := list.New()
-		
+
 		// Keep track of which lists have been initialized and which haven't.
 		mgl_initialized := false
 		ewgl_initialized := false
 		elgl_initialized := false
-		
+
 		// Get every game that all of the Winner champions won.
 		// Get every game that all of the Winner champions lost.
 		// Counting winners only, ratio is: won / (won + lost)
@@ -198,7 +198,7 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 		} else {
 			eligible_losses_gamelist.Init()
 		}
-		
+
 		// If losers are specified we need to consider them as well.
 		// Get every game that all of the games that all Losers lost.
 		// Get every game that all of the games that all Losers won.
@@ -215,7 +215,7 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 				if !ewgl_initialized {
 					ewgl_initialized = initialize(eligible_wins_gamelist, pcgl.Champions[champion].Winning)
 				} else {
-					overlap(eligible_wins_gamelist, pcgl.Champions[champion].Winning)					
+					overlap(eligible_wins_gamelist, pcgl.Champions[champion].Winning)
 				}
 			}
 		} else {
@@ -237,15 +237,15 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 		eligible_gamelist = merge(matching_gamelist, eligible_gamelist)
 
 		// Prepare the response.
-		response := query.GameQueryResponse{}		
+		response := query.GameQueryResponse{}
 		response.Request = &request
 
 		response.Response = &proto.QueryResponse{
 			Successful: gproto.Bool(true),
-			Results: &proto.QueryResponse_Results {
-				Available:  gproto.Uint32( uint32(eligible_gamelist.Len()) ),
-				Matching:   gproto.Uint32( uint32(matching_gamelist.Len()) ),
-				Total:      gproto.Uint32( uint32(len(pcgl.All)) ),
+			Results: &proto.QueryResponse_Results{
+				Available: gproto.Uint32(uint32(eligible_gamelist.Len())),
+				Matching:  gproto.Uint32(uint32(matching_gamelist.Len())),
+				Total:     gproto.Uint32(uint32(len(pcgl.All))),
 			},
 		}
 
@@ -259,8 +259,8 @@ func query_handler(input chan query.GameQueryRequest, pcgl *libcleo.LivePCGL, ou
 func initialize(dest *list.List, src []libcleo.GameId) bool {
 	for _, x := range src {
 		dest.PushBack(x)
-	}	
-	
+	}
+
 	return true
 }
 
@@ -291,7 +291,7 @@ func overlap(first *list.List, second []libcleo.GameId) {
 				// If parallel_counter is as big as it can get then none of
 				// the other numbers in FIRST can overlap.
 				item := item.Prev()
-				
+
 				for item != nil && item.Next() != nil {
 					first.Remove(item.Next())
 				}
@@ -303,17 +303,17 @@ func overlap(first *list.List, second []libcleo.GameId) {
 		// keep the primary value.
 		//
 		// This conditional removes the value first[i] from the list.
-		if second[parallel_counter] > (*item).Value.(libcleo.GameId) { 
+		if second[parallel_counter] > (*item).Value.(libcleo.GameId) {
 			// Delete the current item and advance to the Next() element.
 			next := item.Next()
 
 			first.Remove(item)
-			item = next	
-		// In most cases we want to advance to Next(). 
+			item = next
+			// In most cases we want to advance to Next().
 		} else {
 			item = item.Next()
 		}
-		
+
 		// If second[parallel_counter] is in the linked list then it
 		// will be preserved there since there are no conditions to
 		// remove it.
@@ -328,22 +328,22 @@ func merge(first *list.List, second *list.List) *list.List {
 
 	f_iter := first.Front()
 	s_iter := second.Front()
-	
+
 	for f_iter != nil && s_iter != nil {
 		// If next value in FIRST is less than next value in SECOND,
 		// copy value from FIRST and move on.
 		if f_iter.Value.(libcleo.GameId) < s_iter.Value.(libcleo.GameId) {
 			full.PushBack(f_iter.Value.(libcleo.GameId))
-			
+
 			f_iter = f_iter.Next()
-		// If the two values are the same, copy one of them over. This
-		// will remove duplicates.
+			// If the two values are the same, copy one of them over. This
+			// will remove duplicates.
 		} else if f_iter.Value.(libcleo.GameId) == s_iter.Value.(libcleo.GameId) {
 			full.PushBack(f_iter.Value.(libcleo.GameId))
 
 			f_iter = f_iter.Next()
 			s_iter = s_iter.Next()
-		// Otherwise if FIRST > SECOND, copy over second.
+			// Otherwise if FIRST > SECOND, copy over second.
 		} else {
 			full.PushBack(s_iter.Value.(libcleo.GameId))
 
@@ -352,7 +352,7 @@ func merge(first *list.List, second *list.List) *list.List {
 	}
 
 	// Copy over all remaining values from FIRST and SECOND.
-	if f_iter != nil {		
+	if f_iter != nil {
 		for f_iter != nil {
 			full.PushBack(f_iter.Value.(libcleo.GameId))
 			f_iter = f_iter.Next()

@@ -37,8 +37,8 @@ type PageParams struct {
 }
 
 type SubqueryBundle struct {
-	Explorer	int32
-	Response	proto.QueryResponse
+	Explorer int32
+	Response proto.QueryResponse
 }
 
 const ENABLE_EXPLORATORY_SUBQUERIES = true
@@ -80,17 +80,17 @@ func simple_team(w http.ResponseWriter, r *http.Request) {
 	if is_valid {
 		log.Println(fmt.Sprintf("%s: valid team query [allies=;enemies=]", query.GetQueryId(qry)))
 		response = request(qry)
-		
+
 		if ENABLE_EXPLORATORY_SUBQUERIES {
 			log.Println(fmt.Sprintf("%s: submitting subqueries", query.GetQueryId(qry)))
-			
+
 			subqueries := make(chan SubqueryBundle)
 			num_subqueries := 0
-			
+
 			// Launch a bunch of different subqueries.
 			for _, cid := range proto.ChampionType_value {
 				check_champ := true
-				
+
 				// Check if the champion is already present on the winner's
 				// list.
 				for _, winner := range qry.Winners {
@@ -98,7 +98,7 @@ func simple_team(w http.ResponseWriter, r *http.Request) {
 						check_champ = false
 					}
 				}
-				
+
 				// If the champion already exists, don't fire off this
 				// subquery.
 				if check_champ {
@@ -106,17 +106,17 @@ func simple_team(w http.ResponseWriter, r *http.Request) {
 					num_subqueries += 1
 				}
 			}
-			
+
 			// Collect all of the subquery responses.
 			for i := 0; i < num_subqueries; i++ {
-				bundle := <- subqueries
-				
-				next_champ := proto.QueryResponse_ExploratoryChampionSubquery {
+				bundle := <-subqueries
+
+				next_champ := proto.QueryResponse_ExploratoryChampionSubquery{
 					Explorer: proto.ChampionType(bundle.Explorer),
-					Results: bundle.Results,
-					Valid: (bundle.Response != nil),
+					Results:  bundle.Results,
+					Valid:    (bundle.Response != nil),
 				}
-					
+
 				response.NextChamp = append(response.NextChamp, next_champ)
 			}
 		}
@@ -142,30 +142,29 @@ func simple_team(w http.ResponseWriter, r *http.Request) {
  */
 func explore_subquery(qry proto.GameQuery, explorer_id int32, out chan SubqueryBundle) {
 	qry.Winners = append(qry.Winners, explorer_id)
-	
+
 	// If the query is valid, submit it and pass the response back to the
 	// output channel.
 	if validate_request(qry) {
 		response := request(qry)
-		
-		bundle_response := SubqueryBundle {
+
+		bundle_response := SubqueryBundle{
 			Explorer: explorer_id,
 			Response: response,
-		}	
-		
+		}
+
 		out <- bundle_response
-	// If it's not a valid query we should return a nil response so that
-	// we can still aggregate everything appropriately.
+		// If it's not a valid query we should return a nil response so that
+		// we can still aggregate everything appropriately.
 	} else {
-		bundle_response := SubqueryBundle {
+		bundle_response := SubqueryBundle{
 			Explorer: explorer_id,
 			Response: nil,
 		}
-		
+
 		out <- bundle_response
 	}
 }
-
 
 // Validate current just checks to make sure that all tokens are real.
 func validate_request(qry proto.GameQuery) bool {
@@ -213,7 +212,7 @@ func form_request(allies []string, enemies []string) proto.GameQuery {
 func request(qry proto.GameQuery) proto.QueryResponse {
 	//  Get a switchboard socket to talk to server
 	conn, cerr := switchb.GetStream()
-	
+
 	if cerr != nil {
 		log.Println(fmt.Sprintf("%s: couldn't connect to a Cleo server.", query.GetQueryId(qry)))
 		return proto.QueryResponse{Successful: gproto.Bool(false)}
@@ -232,13 +231,13 @@ func request(qry proto.GameQuery) proto.QueryResponse {
 	log.Println(fmt.Sprintf("%s: awaiting response...", query.GetQueryId(qry)))
 
 	reply, _ := rw.ReadString('|')
-	
+
 	// If we get a zero-length reply this means the backend crashed. Don't
 	//  freak out. We got this.
 	if len(reply) == 0 {
 		return response
 	}
-	
+
 	gproto.Unmarshal([]byte(reply[:len(reply)-1]), &response)
 	log.Println(fmt.Sprintf("%s: valid response received", query.GetQueryId(qry)))
 
@@ -248,8 +247,8 @@ func request(qry proto.GameQuery) proto.QueryResponse {
 func main() {
 	http.HandleFunc("/", index_handler)
 	http.HandleFunc("/team/", simple_team)
-	
-	// Initialize the connection to 
+
+	// Initialize the connection to
 	cerr := error(nil)
 	switchb, cerr = switchboard.NewClient("tcp", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 14002})
 

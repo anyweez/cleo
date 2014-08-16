@@ -19,13 +19,13 @@ func ReadSummonerIds(filename string) []uint32 {
 
 	fp, _ := os.Open(filename)
 	scanner := bufio.NewScanner(fp)
-	
-	// Read and convert the strings into summoner ID's 
+
+	// Read and convert the strings into summoner ID's
 	for scanner.Scan() {
-		sid, _ := strconv.Atoi( scanner.Text() )
-		sids = append( sids, (uint32)(sid) )
+		sid, _ := strconv.Atoi(scanner.Text())
+		sids = append(sids, (uint32)(sid))
 	}
-	
+
 	return sids
 }
 
@@ -33,7 +33,7 @@ func ReadSummonerIds(filename string) []uint32 {
  * Convert string-based timestamp into an appropriate integer format.
  */
 func ConvertTimestamp(date string) uint64 {
-	val, _ := strconv.Atoi( strings.Replace(date, "-", "", -1) )
-	
+	val, _ := strconv.Atoi(strings.Replace(date, "-", "", -1))
+
 	return (uint64)(val)
 }

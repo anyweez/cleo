@@ -7,15 +7,14 @@ import "fmt"
 import "log"
 import "strings"
 
-
 func print_list(l *list.List) {
 	values := make([]string, 0, 100)
 	values = append(values, "list=")
-	
+
 	for iter := l.Front(); iter != nil; iter = iter.Next() {
 		values = append(values, fmt.Sprintf("%s", (*iter).Value))
 	}
-	
+
 	log.Println(strings.Join(values, ","))
 }
 
@@ -25,11 +24,11 @@ func test_compare(first *list.List, second []libcleo.GameId) bool {
 	}
 
 	f_iter := first.Front()
-	for i := 0; i < len(second); i++ {		
+	for i := 0; i < len(second); i++ {
 		if (*f_iter).Value.(libcleo.GameId) != second[i] {
 			return false
 		}
-		
+
 		f_iter = f_iter.Next()
 	}
 
@@ -39,15 +38,15 @@ func test_compare(first *list.List, second []libcleo.GameId) bool {
 func TestOverlap1(t *testing.T) {
 	a := list.New()
 	for i := 0; i < 10; i++ {
-		a.PushBack( libcleo.GameId(i) )
-	} 
+		a.PushBack(libcleo.GameId(i))
+	}
 	b := []libcleo.GameId{2, 3, 4}
 
 	log.Println("Testing overlap.")
 	print_list(a)
 	overlap(a, b)
 	print_list(a)
-	
+
 	log.Println("Overlap complete. Comparing results.")
 	if !test_compare(a, []libcleo.GameId{2, 3, 4}) {
 		t.Fail()
@@ -58,7 +57,7 @@ func TestOverlap2(t *testing.T) {
 	a := list.New()
 	for i := 0; i < 10; i++ {
 		a.PushBack(libcleo.GameId(i))
-	} 	
+	}
 	b := []libcleo.GameId{2, 4, 5}
 
 	overlap(a, b)
@@ -156,7 +155,6 @@ func TestMerge1(t *testing.T) {
 	}
 }
 
-
 func TestMerge2(t *testing.T) {
 	a := list.New()
 	a.PushBack(libcleo.GameId(1))
@@ -194,12 +192,12 @@ func TestMerge4(t *testing.T) {
 	a.PushBack(libcleo.GameId(3))
 	a.PushBack(libcleo.GameId(4))
 	a.PushBack(libcleo.GameId(5))
-	
+
 	b := list.New()
 	b.PushBack(libcleo.GameId(3))
 	b.PushBack(libcleo.GameId(5))
 	b.PushBack(libcleo.GameId(6))
-	
+
 	if !test_compare(merge(a, b), []libcleo.GameId{3, 4, 5, 6}) {
 		t.Fail()
 	}
