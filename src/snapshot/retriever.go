@@ -77,7 +77,7 @@ func (r *Retriever) GetSnapshots(sid uint32) {
 	
 }
 
-func (r *Retriever) SaveSnapshot(snapshot *proto.PlayerSnapshot) {
+func (r *Retriever) SaveSnapshot(sid uint32, key string, snapshot *proto.PlayerSnapshot) {
 	
 }
 
