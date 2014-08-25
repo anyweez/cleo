@@ -7,8 +7,10 @@ package snapshot
  */
  
  import (
+	
 // 	"labix.org/v2/mgo"
-//	"labix.org/v2/mgo/bson"
+	"labix.org/v2/mgo/bson"
+	"libcleo"
 	"proto"
  )
  
@@ -46,14 +48,16 @@ func (r *Retriever) Init() {
  */
 func (r *Retriever) GetGames(date_str string) []proto.GameRecord {
 	games := make([]proto.GameRecord, 0, 100)
-	date := ConvertTimestamp(date_str)
-	
+	start, end := ConvertTimestamp(date_str)
+
+	// TODO: this needs to use the same timestamp format as what's being
+	// stored, which I believe is UNIX-based.	
 	query := r.games_collection.Find(bson.M{ "timestamp": date })
 	result_iter := query.Iter()
 
 	result := libcleo.RecordContainer{}
 	for result_iter.Next(&result) {
-		game := proto.GameRecord{}
+		game := gamelog.GameRecord{}
 		gproto.Unmarshal(result.GameData, &game)
 		
 		games = append(games, game)

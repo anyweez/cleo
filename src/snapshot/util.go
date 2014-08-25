@@ -32,8 +32,10 @@ func ReadSummonerIds(filename string) []uint32 {
 /**
  * Convert string-based timestamp into an appropriate integer format.
  */
-func ConvertTimestamp(date string) uint64 {
-	val, _ := strconv.Atoi( strings.Replace(date, "-", "", -1) )
-	
-	return (uint64)(val)
+func ConvertTimestamp(date string) (uint64, uint64) {
+	start, _ := strconv.Atoi( strings.Replace(date, "-", "", -1) )
+//	end :=
+
+
+	return (uint64)(start), 0
 }
