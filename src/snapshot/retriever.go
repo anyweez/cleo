@@ -5,35 +5,32 @@ package snapshot
  * Mongo; it acts as an abstraction layer that separates schema from
  * business logic.
  */
- 
  import (
-	
 // 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	"libcleo"
 	"proto"
- )
- 
- /**
-  * The high-level schemas are as follows:
-  * 
-  * - lolstat
-  * 	- games
-  *  	    Keyed by: game id
-  * 		Source: Riot API
-  * 		Purpose: raw storage for game data
-  * 	- players
-  * 		Keyed by: summoner id
-  * 		Source: built from games table by join-summoners process
-  * 		Purpose: summarized player stats
-  */
-  
+)
+
+/**
+ * The high-level schemas are as follows:
+ *
+ * - lolstat
+ * 	- games
+ *  	    Keyed by: game id
+ * 		Source: Riot API
+ * 		Purpose: raw storage for game data
+ * 	- players
+ * 		Keyed by: summoner id
+ * 		Source: built from games table by join-summoners process
+ * 		Purpose: summarized player stats
+ */
+
 type Retriever struct {
-	
 }
 
 func (r *Retriever) Init() {
-	
+
 }
 
 /***************
@@ -43,7 +40,7 @@ func (r *Retriever) Init() {
 /**
  * Get all of the games relevant for generating a snapshot for the
  * provided date.
- * 
+ *
  * TODO: retrieve all games played in the two weeks before this date.
  */
 func (r *Retriever) GetGames(date_str string) []proto.GameRecord {
@@ -59,10 +56,10 @@ func (r *Retriever) GetGames(date_str string) []proto.GameRecord {
 	for result_iter.Next(&result) {
 		game := gamelog.GameRecord{}
 		gproto.Unmarshal(result.GameData, &game)
-		
+
 		games = append(games, game)
 	}
-	
+
 	return games
 }
 
@@ -70,7 +67,7 @@ func (r *Retriever) GetGames(date_str string) []proto.GameRecord {
  * Add a game to the game log.
  */
 func (r *Retriever) SaveGame(record *proto.GameRecord) {
-	
+
 }
 
 /*******************
@@ -78,16 +75,16 @@ func (r *Retriever) SaveGame(record *proto.GameRecord) {
  *******************/
 
 func (r *Retriever) GetSnapshots(sid uint32) {
-	
+
 }
 
 func (r *Retriever) SaveSnapshot(sid uint32, key string, snapshot *proto.PlayerSnapshot) {
-	
+
 }
 
 /**
  * Overwrites the existing snapshot with a newly provided one.
  */
 func (r *Retriever) UpdateSnapshot(snapshot *proto.PlayerSnapshot) {
-	
+
 }

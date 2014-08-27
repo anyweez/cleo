@@ -4,14 +4,14 @@ import yamux "github.com/hashicorp/yamux"
 import "net"
 
 type SwitchboardClient struct {
-	Connection 	*net.TCPConn
-	Session		*yamux.Session
+	Connection *net.TCPConn
+	Session    *yamux.Session
 }
 
 type SwitchboardServer struct {
-	Connection 	*net.TCPConn
-	Session		*yamux.Session
-	Listener	*net.TCPListener
+	Connection *net.TCPConn
+	Session    *yamux.Session
+	Listener   *net.TCPListener
 }
 
 /**

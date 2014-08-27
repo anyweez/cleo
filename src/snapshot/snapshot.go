@@ -5,7 +5,7 @@ import (
 )
 
 // List containing a bunch of pointers to functions. Each function will
-// be called on snapshots to generate a 
+// be called on snapshots to generate a
 // TODO: this needs to be a list of functions
 var Computations = make([]int, 0, 10)
 
@@ -26,6 +26,6 @@ func minionKills(snapshot *proto.PlayerSnapshot) (string, float64, uint32) {
 
 /*
 interface SnapshotComputation {
-	
+
 }
 * */

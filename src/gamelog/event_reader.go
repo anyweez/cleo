@@ -13,18 +13,18 @@ func Read(filename string) *proto.GameLog {
 		fmt.Printf("Cannot find file.")
 		return &proto.GameLog{}
 	}
-	
+
 	fi, err := file.Stat()
 	buffer := make([]byte, fi.Size())
-	
+
 	_, err = file.Read(buffer)
 	if err != nil {
 		fmt.Printf("Cannot read full file.")
 	}
-	
+
 	event_log := &proto.GameLog{}
-	gproto.Unmarshal(buffer, event_log) 
-	
+	gproto.Unmarshal(buffer, event_log)
+
 	// Return a GameLog
 	return event_log
 }
