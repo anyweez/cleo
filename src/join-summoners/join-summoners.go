@@ -1,10 +1,19 @@
 package main
 
 /**
+<<<<<<< HEAD
  * This process reads in a list of summoner ID's and produces a record for each
  * summoner keyed by summoner ID. Usage is as follows:
  *
  * ./jsummoner --date=2014-08-07 --summoners=data/summoners/0001.list
+=======
+ * This process creates or updates a record for each summoner ID
+ * in the list provided as an input. Each record includes a "daily"
+ * key that contains a bunch of records with summary stats for a
+ * given day.
+ * 
+ * ./join-summoners --date=2014-08-07 --summoners=data/summoners/0001.list
+>>>>>>> 7f64d76af18336314d61aed7b322716c8dce2090
  */
 
 import (
@@ -20,7 +29,7 @@ import (
 )
 
 var SUMMONER_FILE = flag.String("summoners", "", "The filename containing a list of summoner ID's.")
-var TARGET_DATE = flag.String("date", "", "The date to join in YYYY-MM-DD form.")
+var TARGET_DATE = flag.String("date", "0000-00-00", "The date to join in YYYY-MM-DD form.")
 
 /**
  * Goroutine that generates a report for a single summoner ID. It reads
@@ -30,12 +39,12 @@ var TARGET_DATE = flag.String("date", "", "The date to join in YYYY-MM-DD form."
  */
 func handle_summoner(sid uint32, input chan *proto.GameRecord) {
 	games := make([]*proto.GameRecord, 0, 10)
-
+	game_ids := make([]uint64, 0, 10)
 	// Keep reading from the channel until nil comes through, then we're
 	// done receiving info.
-	keeper := false
-	gr := <-input
+	gr := <- input
 	for gr != nil {
+		keeper := false
 		for _, team := range gr.Teams {
 			for _, player := range team.Players {
 				if *player.Player.SummonerId == sid {
@@ -46,6 +55,7 @@ func handle_summoner(sid uint32, input chan *proto.GameRecord) {
 
 		if keeper {
 			games = append(games, gr)
+			game_ids = append(game_ids, gr.GameId)
 		}
 
 		gr = <-input
@@ -53,67 +63,29 @@ func handle_summoner(sid uint32, input chan *proto.GameRecord) {
 
 	// Now all games have been processed. We need to save the set of
 	// games to a PlayerSnapshot for today.
-	snap := proto.PlayerSnapshot{}
-	snap.Timestamp = gproto.Uint64(convert_ts(*TARGET_DATE))
-	snap.Games = games
-	snap.SummonerId = gproto.Uint32((uint32)(sid))
-	// TODO: add rank to this snapshot.
+	snap := snapshot.PlayerSnapshot{}
 
+	ts_start, ts_end := convert_ts(*TARGET_DATE)
+	snap.StartTimestamp = ts_start
+	snap.EndTimestamp = ts.end
+	snap.SummonerId = (uint32)(sid)
+	snap.GamesList = game_ids
+
+	// TODO: populate snap.CreationTimestamp
+	snap.Stats = make([]snapshot.PlayerStat, 0, 10)
+
+        // Update each snapshot with new computations.
+        for _, comp := snapshot.Computations {
+        	sv := snapshot.PlayerStat{}
+        	sv.Name, sv.Absolute, sv.Normalized = comp(snapshot)
+        }
+	
 	// Commit to datastore
 	retriever := snapshot.Retriever{}
 	retriever.Init()
 
-	retriever.SaveSnapshot(&snap)
-
-	//	save_snapshot(snapshot)
+	retriever.SaveSnapshot(sid, *TARGET_DATE, &snap)
 }
-
-/**
- * Record a single snapshot into MongoDB.
- */
-/*
- * func save_snapshot(snapshot proto.PlayerSnapshot) {
-	session, _ := mgo.Dial("127.0.0.1:27017")
-	games_collection := session.DB("lolstat").C("players-" + *TARGET_DATE)
-	defer session.Close()
-
-	snap := libproc.PlayerSnapshotContainer{}
-	snap.Snapshot, _ = gproto.Marshal(&snapshot)
-	snap.Timestamp = *snapshot.Timestamp
-	snap.SummonerId = *snapshot.SummonerId
-
-	games_collection.Insert(snap)
-}
-*/
-
-/**
- * Retrieve all games that are relevant to the calculation. Currently
- * fetching all games, but should probably be reduced to X days.
- *
- * TODO: fetch games in range (two_weeks_ago, TARGET_DATE)
- */
-
-/*func get_games() []proto.GameRecord {
-	games := make([]proto.GameRecord, 0, 100)
-
-	session, _ := mgo.Dial("127.0.0.1:27017")
-	games_collection := session.DB("lolstat").C("games")
-	defer session.Close()
-
-	// TODO: this should be a sliding window (2 weeks) instead of a single day
-	query := games_collection.Find(bson.M{ "timestamp": convert_ts(*TARGET_DATE) })
-	result_iter := query.Iter()
-
-	result := libcleo.RecordContainer{}
-	for result_iter.Next(&result) {
-		game := proto.GameRecord{}
-		gproto.Unmarshal(result.GameData, &game)
-
-		games = append(games, game)
-	}
-
-	return games
-}*/
 
 /**
  * The main function reads in all of the summoner ID's that this process
