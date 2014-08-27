@@ -6,10 +6,10 @@ package snapshot
  * business logic.
  */
  import (
-// 	"labix.org/v2/mgo"
+	"gamelog"
+	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
-	"libcleo"
-	"proto"
+	"log"
 )
 
 /**
@@ -27,10 +27,14 @@ package snapshot
  */
 
 type Retriever struct {
+	games_collection	*mgo.Collection
+	summoner_collection	*mgo.Collection
 }
 
 func (r *Retriever) Init() {
-
+        session, _ := mgo.Dial("127.0.0.1:27017")
+        r.games_collection = session.DB("lolstat").C("games")
+	r.summoner_collection = session.DB("lolstat").C("summoners")
 }
 
 /***************
@@ -43,21 +47,18 @@ func (r *Retriever) Init() {
  *
  * TODO: retrieve all games played in the two weeks before this date.
  */
-func (r *Retriever) GetGames(date_str string) []proto.GameRecord {
-	games := make([]proto.GameRecord, 0, 100)
+func (r *Retriever) GetGames(date_str string) []gamelog.GameRecord {
+	games := make([]gamelog.GameRecord, 0, 100)
 	start, end := ConvertTimestamp(date_str)
 
 	// TODO: this needs to use the same timestamp format as what's being
-	// stored, which I believe is UNIX-based.	
-	query := r.games_collection.Find(bson.M{ "timestamp": date })
+	// stored, which is a millisecond-based UNIX timestamp.	
+	query := r.games_collection.Find(bson.M{ "timestamp": bson.M{ "$gt" : start, "$lt": end } })
 	result_iter := query.Iter()
 
-	result := libcleo.RecordContainer{}
+	result := gamelog.GameRecord{}
 	for result_iter.Next(&result) {
-		game := gamelog.GameRecord{}
-		gproto.Unmarshal(result.GameData, &game)
-
-		games = append(games, game)
+		games = append(games, result)
 	}
 
 	return games
@@ -66,7 +67,7 @@ func (r *Retriever) GetGames(date_str string) []proto.GameRecord {
 /**
  * Add a game to the game log.
  */
-func (r *Retriever) SaveGame(record *proto.GameRecord) {
+func (r *Retriever) SaveGame(record *gamelog.GameRecord) {
 
 }
 
@@ -74,17 +75,36 @@ func (r *Retriever) SaveGame(record *proto.GameRecord) {
  **** SNAPSHOTS ****
  *******************/
 
+func (r *Retriever) NewSummoner(sid uint32) {
+	record := SummonerRecord{}
+
+        record.SummonerId = sid
+        record.Daily = make(map[string]*PlayerSnapshot)
+
+	r.summoner_collection.Insert(record)
+}
+
 func (r *Retriever) GetSnapshots(sid uint32) {
 
 }
 
-func (r *Retriever) SaveSnapshot(sid uint32, key string, snapshot *proto.PlayerSnapshot) {
+func (r *Retriever) SaveSnapshot(sid uint32, subset_name string, key string, ss *PlayerSnapshot) {
+	query := r.summoner_collection.Find(bson.M{"_id": sid})
 
-}
+	// TODO: do this at some point once it's relevant.
+	if subset_name != "daily" {
+		log.Fatal("Haven't implemented support for saving snapshots of type '" + subset_name + "'")
+	}
 
-/**
- * Overwrites the existing snapshot with a newly provided one.
- */
-func (r *Retriever) UpdateSnapshot(snapshot *proto.PlayerSnapshot) {
+	// If we didn't find a record, the player exists and we can get rolling.
+	count, _ := query.Count()
+	if count == 0 {
+		r.NewSummoner(sid)
+	}
 
+	record := SummonerRecord{}
+	r.summoner_collection.Find(bson.M{"_id": sid}).One(&record)
+
+	record.Daily[key] = ss
+	r.summoner_collection.Update( bson.M{"_id": record.SummonerId}, record )
 }

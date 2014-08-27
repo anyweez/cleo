@@ -1,30 +1,19 @@
 package main
 
 /**
-<<<<<<< HEAD
- * This process reads in a list of summoner ID's and produces a record for each
- * summoner keyed by summoner ID. Usage is as follows:
- *
- * ./jsummoner --date=2014-08-07 --summoners=data/summoners/0001.list
-=======
  * This process creates or updates a record for each summoner ID
  * in the list provided as an input. Each record includes a "daily"
  * key that contains a bunch of records with summary stats for a
  * given day.
- * 
+ *
  * ./join-summoners --date=2014-08-07 --summoners=data/summoners/0001.list
->>>>>>> 7f64d76af18336314d61aed7b322716c8dce2090
  */
 
 import (
-	gproto "code.google.com/p/goprotobuf/proto"
 	"flag"
-	//	"libcleo"
-	//	"libproc"
+	"gamelog"
 	"log"
-	"proto"
 	"snapshot"
-	"strconv"
 	"strings"
 )
 
@@ -37,17 +26,18 @@ var TARGET_DATE = flag.String("date", "0000-00-00", "The date to join in YYYY-MM
  * target summoner ID. It then condenses them into a single PlayerSnapshot
  * and saves it to MongoDB.
  */
-func handle_summoner(sid uint32, input chan *proto.GameRecord) {
-	games := make([]*proto.GameRecord, 0, 10)
+func handle_summoner(sid uint32, input chan *gamelog.GameRecord) {
+	games := make([]*gamelog.GameRecord, 0, 10)
 	game_ids := make([]uint64, 0, 10)
 	// Keep reading from the channel until nil comes through, then we're
-	// done receiving info.
-	gr := <- input
+	// done receiving info. If the summoner this goroutine is responsible
+	// for played in the game, keep it. Otherwise forget about it.
+	gr := <-input
 	for gr != nil {
 		keeper := false
 		for _, team := range gr.Teams {
 			for _, player := range team.Players {
-				if *player.Player.SummonerId == sid {
+				if player.Player.SummonerId == sid {
 					keeper = true
 				}
 			}
@@ -65,26 +55,26 @@ func handle_summoner(sid uint32, input chan *proto.GameRecord) {
 	// games to a PlayerSnapshot for today.
 	snap := snapshot.PlayerSnapshot{}
 
-	ts_start, ts_end := convert_ts(*TARGET_DATE)
+	ts_start, ts_end := snapshot.ConvertTimestamp(*TARGET_DATE)
 	snap.StartTimestamp = ts_start
-	snap.EndTimestamp = ts.end
+	snap.EndTimestamp = ts_end
 	snap.SummonerId = (uint32)(sid)
 	snap.GamesList = game_ids
 
 	// TODO: populate snap.CreationTimestamp
 	snap.Stats = make([]snapshot.PlayerStat, 0, 10)
 
-        // Update each snapshot with new computations.
-        for _, comp := snapshot.Computations {
-        	sv := snapshot.PlayerStat{}
-        	sv.Name, sv.Absolute, sv.Normalized = comp(snapshot)
-        }
-	
+	// Update each snapshot with new computations.
+	for _, comp := range snapshot.Computations {
+		sv := snapshot.PlayerStat{}
+		sv.Name, sv.Absolute, sv.Normalized = comp(&snap)
+	}
+
 	// Commit to datastore
 	retriever := snapshot.Retriever{}
 	retriever.Init()
 
-	retriever.SaveSnapshot(sid, *TARGET_DATE, &snap)
+	retriever.SaveSnapshot(sid, "daily", *TARGET_DATE, &snap)
 }
 
 /**
@@ -115,7 +105,7 @@ func main() {
 
 	/* Read in the list of summoner ID's from a file provided by the user. */
 	sids := snapshot.ReadSummonerIds(*SUMMONER_FILE)
-	sid_chan := make([]chan *proto.GameRecord, len(sids))
+	sid_chan := make([]chan *gamelog.GameRecord, len(sids))
 
 	running := make(chan bool)
 

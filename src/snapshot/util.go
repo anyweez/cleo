@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"os"
 	"strconv"
+	"time"
 )
 
 /**
@@ -33,8 +34,10 @@ func ReadSummonerIds(filename string) []uint32 {
  * Convert string-based timestamp into an appropriate integer format.
  */
 func ConvertTimestamp(date string) (uint64, uint64) {
-	start, _ := strconv.Atoi( strings.Replace(date, "-", "", -1) )
-//	end :=
+	start, _ := time.Parse("2006-01-02", date)
+	end_duration, _ := time.ParseDuration("23h59m59s")
+	end := start.Add(end_duration)
 
-	return (uint64)(start), 0
+	// The timestamps in the database are in milliseconds, not seconds.
+	return (uint64)(start.Unix() * 1000), (uint64)(end.Unix() * 1000)
 }

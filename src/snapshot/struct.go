@@ -4,6 +4,12 @@ package snapshot
  * This file defines the data structure for storing snapshots.
  */
 
+type SummonerRecord struct {
+        SummonerId	uint32 `json:"id" bson:"_id"`
+	LastUpdated	uint64
+	Daily		map[string]*PlayerSnapshot
+}
+
 type PlayerSnapshot struct {
 	// Time boundaries
 	StartTimestamp		uint64
@@ -23,6 +29,6 @@ type PlayerSnapshot struct {
 
 type PlayerStat struct {
 	Name		string
-	Absolute	float32
-	Normalized	float32
+	Absolute	float64
+	Normalized	uint32
 }
