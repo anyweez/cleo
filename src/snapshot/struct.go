@@ -12,8 +12,8 @@ type SummonerRecord struct {
 
 type PlayerSnapshot struct {
 	// Time boundaries
-	StartTimestamp		uint64
-	EndTimestamp		uint64
+//	StartTimestamp		uint64
+//	EndTimestamp		uint64
 
 	SummonerId		uint32
 	GamesList		[]uint64

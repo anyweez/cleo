@@ -247,6 +247,12 @@ func retrieve(summoner uint32, collection *mgo.Collection, cm *CandidateManager)
 	}
 }
 
+func timestampToQuickdate(ts uint64) uint32 {
+	num, _ := strconv.Atoi( time.Unix( (int64)(ts / 1000), 0).Format("20060102") )
+	
+	return (uint32)(num)
+}
+
 // Adaptor to convert the JSON format to GameLog format.
 //
 // This function converts Riot's JSON format into GameLog entries which
@@ -264,6 +270,7 @@ func convert(response *JSONResponse) []gamelog.GameRecord {
 		record := gamelog.GameRecord{}
 
 		record.Timestamp = game.CreateDate
+		record.QuickDate = timestampToQuickdate(record.Timestamp)
 		record.GameId = game.GameId
 
 		team1 := gamelog.Team{}

@@ -18,6 +18,7 @@ type GameRecord struct {
 	MergeCount uint32 // The number of players that have been merged into this record (1 => 10)
 	Timestamp  uint64
 	Duration   uint32
+	QuickDate	uint32
 	GameId     uint64 `json:"id" bson:"_id"`
 
 	Teams []*Team

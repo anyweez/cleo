@@ -10,6 +10,7 @@ package snapshot
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	"log"
+	"strconv"
 	"time"
 )
 
@@ -46,26 +47,17 @@ func (r *Retriever) Init() {
  * Get all of the games relevant for generating a snapshot for the
  * provided date.
  *
- * TODO: retrieve all games played in the two weeks before this date.
+ * Note that the current implementation only works for single days and
+ * gains a ton of speed from this optimization (quickdate is indexed).
  */
 func (r *Retriever) GetGamesIter(date_str string) *mgo.Iter {
-//	games := make([]gamelog.GameRecord, 0, 100)
-	start, end := ConvertTimestamp(date_str)
+	start, _ := time.Parse("2006-01-02", date_str)
+	start_str, _ := strconv.Atoi( start.Format("20060102") )
 
 	// TODO: this needs to use the same timestamp format as what's being
 	// stored, which is a millisecond-based UNIX timestamp.	
-	query := r.games_collection.Find(bson.M{"timestamp": bson.M{ "$gt" : start, "$lt": end } })
+	query := r.games_collection.Find(bson.M{"quickdate": start_str})
 	return query.Iter()
-//	result_iter := query.Iter()
-
-/*
-	result := gamelog.GameRecord{}
-	for result_iter.Next(&result) {
-		games = append(games, result)
-	}
-
-	return games
-*/
 }
 
 /**
