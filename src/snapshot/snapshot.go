@@ -1,9 +1,10 @@
 package snapshot
 
 import (
+	"gamelog"
 )
 
-type SnapshotFunction func(snapshot *PlayerSnapshot) (string, float64, uint32)
+type SnapshotFunction func(snapshot *PlayerSnapshot, games []*gamelog.GameRecord) (string, float64, uint32)
 
 // List containing a bunch of pointers to functions. Each function will
 // be called on snapshots to generate a
@@ -18,19 +19,41 @@ func init() {
 /**
  * Computes the mean KDA for a given snapshot.
  */
-func kda(snapshot *PlayerSnapshot) (string, float64, uint32) {
-	return "kda", 10, 50
+func kda(snapshot *PlayerSnapshot, games []*gamelog.GameRecord) (string, float64, uint32) {
+	var num_kills uint32 = 0
+	var num_deaths uint32 = 0
+	var num_assists uint32 = 0
+	
+	for _, game := range games {
+		for _, team := range game.Teams {
+			for _, player := range team.Players {
+				if snapshot.SummonerId == player.Player.SummonerId {
+					num_kills += player.Kills
+					num_deaths += player.Deaths
+					num_assists += player.Assists
+				}
+			}
+		}
+	}
+	
+	return "kda", (float64)(num_kills + num_assists) / (float64)(num_deaths), 0
 }
 
 /**
  * Computes the mean # of minion kills for a given snapshot.
  */
-func minionKills(snapshot *PlayerSnapshot) (string, float64, uint32) {
-	return "minionKills", 200, 15
-}
+func minionKills(snapshot *PlayerSnapshot, games []*gamelog.GameRecord) (string, float64, uint32) {
+	var num_minions uint32 = 0
 
-/*
-interface SnapshotComputation {
+	for _, game := range games {
+		for _, team := range game.Teams {
+			for _, player := range team.Players {
+				if snapshot.SummonerId == player.Player.SummonerId {
+					num_minions += player.Minions
+				}
+			}
+		}
+	}
 
+	return "minionKills", (float64)(num_minions) / (float64)(len(games)), 0
 }
-* */

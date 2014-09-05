@@ -11,14 +11,18 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"gamelog"
 	"log"
 	"snapshot"
 	"strings"
+	"time"
 )
 
 var SUMMONER_FILE = flag.String("summoners", "", "The filename containing a list of summoner ID's.")
 var TARGET_DATE = flag.String("date", "0000-00-00", "The date to join in YYYY-MM-DD form.")
+// TODO: Convert this to a channel
+var SUMMONER_GR_RUNNING = 0
 
 /**
  * Goroutine that generates a report for a single summoner ID. It reads
@@ -26,13 +30,15 @@ var TARGET_DATE = flag.String("date", "0000-00-00", "The date to join in YYYY-MM
  * target summoner ID. It then condenses them into a single PlayerSnapshot
  * and saves it to MongoDB.
  */
-func handle_summoner(sid uint32, input chan *gamelog.GameRecord) {
+func handle_summoner(sid uint32, input chan *gamelog.GameRecord, done chan bool) {
 	games := make([]*gamelog.GameRecord, 0, 10)
 	game_ids := make([]uint64, 0, 10)
+	SUMMONER_GR_RUNNING += 1
+	
 	// Keep reading from the channel until nil comes through, then we're
 	// done receiving info. If the summoner this goroutine is responsible
 	// for played in the game, keep it. Otherwise forget about it.
-	gr := <-input
+	gr := <- input
 	for gr != nil {
 		keeper := false
 		for _, team := range gr.Teams {
@@ -58,6 +64,7 @@ func handle_summoner(sid uint32, input chan *gamelog.GameRecord) {
 	ts_start, ts_end := snapshot.ConvertTimestamp(*TARGET_DATE)
 	snap.StartTimestamp = ts_start
 	snap.EndTimestamp = ts_end
+	snap.CreationTimestamp = (uint64)(time.Now().Unix())
 	snap.SummonerId = (uint32)(sid)
 	snap.GamesList = game_ids
 
@@ -67,7 +74,9 @@ func handle_summoner(sid uint32, input chan *gamelog.GameRecord) {
 	// Update each snapshot with new computations.
 	for _, comp := range snapshot.Computations {
 		sv := snapshot.PlayerStat{}
-		sv.Name, sv.Absolute, sv.Normalized = comp(&snap)
+		sv.Name, sv.Absolute, sv.Normalized = comp(&snap, games)
+		
+		snap.Stats = append(snap.Stats, sv)
 	}
 
 	// Commit to datastore
@@ -75,6 +84,9 @@ func handle_summoner(sid uint32, input chan *gamelog.GameRecord) {
 	retriever.Init()
 
 	retriever.SaveSnapshot(sid, "daily", *TARGET_DATE, &snap)
+	
+	SUMMONER_GR_RUNNING -= 1
+	done <- true
 }
 
 /**
@@ -90,6 +102,7 @@ func main() {
 	flag.Parse()
 
 	// Create a retriever for I/O
+	log.Println("Initializing retriever...")
 	retriever := snapshot.Retriever{}
 	retriever.Init()
 
@@ -104,31 +117,41 @@ func main() {
 	}
 
 	/* Read in the list of summoner ID's from a file provided by the user. */
-	sids := snapshot.ReadSummonerIds(*SUMMONER_FILE)
+	sids := snapshot.ReadSummonerIds(*SUMMONER_FILE)[:3]
 	sid_chan := make([]chan *gamelog.GameRecord, len(sids))
+	log.Println(fmt.Sprintf("Read %d summoners from champion list.", len(sids)))
 
 	running := make(chan bool)
 
 	/* Create a bunch of goroutines, one per summoner, that can be used
 	 * to filter records. */
 	for i, sid := range sids {
-		go handle_summoner(sid, sid_chan[i])
+		sid_chan[i] = make(chan *gamelog.GameRecord)
+		go handle_summoner(sid, sid_chan[i], running)
 	}
 
 	/* Retrieve all events. */
-	games := retriever.GetGames(*TARGET_DATE)
+//	log.Println(fmt.Sprintf("Retrieving games from %s...", *TARGET_DATE))
+//	games := retriever.GetGames(*TARGET_DATE)
+//	log.Println(fmt.Sprintf("Retrieved %d games.", len(games)))
 
 	/* Pass each event to a goroutine that handles each summoner ID. */
+/*
 	for i, _ := range sids {
+		log.Println("Creating summoner GR #", i)
 		for _, game := range games {
 			sid_chan[i] <- &game
 		}
-
+		
 		// Sending a nil means that the goroutine doesn't need to wait
 		// for more data.
-		sid_chan[i] <- nil
+		sid_chan[i] <- nil		
+		
+		for SUMMONER_GR_RUNNING > 10 {
+			
+		}
 	}
-
+*/
 	for i := 0; i < len(sids); i++ {
 		<-running
 	}

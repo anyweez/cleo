@@ -10,6 +10,7 @@ package snapshot
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	"log"
+	"time"
 )
 
 /**
@@ -25,6 +26,7 @@ package snapshot
  * 		Source: built from games table by join-summoners process
  * 		Purpose: summarized player stats
  */
+var session, _ = mgo.Dial("127.0.0.1:27017")
 
 type Retriever struct {
 	games_collection	*mgo.Collection
@@ -32,8 +34,7 @@ type Retriever struct {
 }
 
 func (r *Retriever) Init() {
-        session, _ := mgo.Dial("127.0.0.1:27017")
-        r.games_collection = session.DB("lolstat").C("games")
+    r.games_collection = session.DB("lolstat").C("games")
 	r.summoner_collection = session.DB("lolstat").C("summoners")
 }
 
@@ -47,21 +48,24 @@ func (r *Retriever) Init() {
  *
  * TODO: retrieve all games played in the two weeks before this date.
  */
-func (r *Retriever) GetGames(date_str string) []gamelog.GameRecord {
+func (r *Retriever) GetGamesIter(date_str string) mgo.Iter {
 	games := make([]gamelog.GameRecord, 0, 100)
 	start, end := ConvertTimestamp(date_str)
 
 	// TODO: this needs to use the same timestamp format as what's being
 	// stored, which is a millisecond-based UNIX timestamp.	
-	query := r.games_collection.Find(bson.M{ "timestamp": bson.M{ "$gt" : start, "$lt": end } })
-	result_iter := query.Iter()
+	query := r.games_collection.Find(bson.M{"timestamp": bson.M{ "$gt" : start, "$lt": end } })
+	return query.Iter()
+//	result_iter := query.Iter()
 
+/*
 	result := gamelog.GameRecord{}
 	for result_iter.Next(&result) {
 		games = append(games, result)
 	}
 
 	return games
+*/
 }
 
 /**
@@ -106,5 +110,6 @@ func (r *Retriever) SaveSnapshot(sid uint32, subset_name string, key string, ss 
 	r.summoner_collection.Find(bson.M{"_id": sid}).One(&record)
 
 	record.Daily[key] = ss
+	record.LastUpdated = (uint64)(time.Now().Unix())
 	r.summoner_collection.Update( bson.M{"_id": record.SummonerId}, record )
 }
