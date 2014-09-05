@@ -21,8 +21,6 @@ import (
 
 var SUMMONER_FILE = flag.String("summoners", "", "The filename containing a list of summoner ID's.")
 var TARGET_DATE = flag.String("date", "0000-00-00", "The date to join in YYYY-MM-DD form.")
-// TODO: Convert this to a channel
-var SUMMONER_GR_RUNNING = 0
 
 /**
  * Goroutine that generates a report for a single summoner ID. It reads
@@ -33,15 +31,20 @@ var SUMMONER_GR_RUNNING = 0
 func handle_summoner(sid uint32, input chan *gamelog.GameRecord, done chan bool) {
 	games := make([]*gamelog.GameRecord, 0, 10)
 	game_ids := make([]uint64, 0, 10)
-	SUMMONER_GR_RUNNING += 1
 	
 	// Keep reading from the channel until nil comes through, then we're
 	// done receiving info. If the summoner this goroutine is responsible
 	// for played in the game, keep it. Otherwise forget about it.
-	gr := <- input
-	for gr != nil {
+	
+	retriever := snapshot.Retriever{}
+	retriever.Init()
+	
+	iter := retriever.GetGamesIter(*TARGET_DATE)
+	result := gamelog.GameRecord{}
+
+	for iter.Next(&result) {
 		keeper := false
-		for _, team := range gr.Teams {
+		for _, team := range result.Teams {
 			for _, player := range team.Players {
 				if player.Player.SummonerId == sid {
 					keeper = true
@@ -50,11 +53,9 @@ func handle_summoner(sid uint32, input chan *gamelog.GameRecord, done chan bool)
 		}
 
 		if keeper {
-			games = append(games, gr)
-			game_ids = append(game_ids, gr.GameId)
+			games = append(games, &result)
+			game_ids = append(game_ids, result.GameId)
 		}
-
-		gr = <-input
 	}
 
 	// Now all games have been processed. We need to save the set of
@@ -79,13 +80,8 @@ func handle_summoner(sid uint32, input chan *gamelog.GameRecord, done chan bool)
 		snap.Stats = append(snap.Stats, sv)
 	}
 
-	// Commit to datastore
-	retriever := snapshot.Retriever{}
-	retriever.Init()
-
 	retriever.SaveSnapshot(sid, "daily", *TARGET_DATE, &snap)
 	
-	SUMMONER_GR_RUNNING -= 1
 	done <- true
 }
 
@@ -101,11 +97,6 @@ func handle_summoner(sid uint32, input chan *gamelog.GameRecord, done chan bool)
 func main() {
 	flag.Parse()
 
-	// Create a retriever for I/O
-	log.Println("Initializing retriever...")
-	retriever := snapshot.Retriever{}
-	retriever.Init()
-
 	// Check to make sure that a file was provided.
 	if len(*SUMMONER_FILE) == 0 {
 		log.Fatal("You must specify a list of summoner ID's with the --summoners flag")
@@ -117,7 +108,7 @@ func main() {
 	}
 
 	/* Read in the list of summoner ID's from a file provided by the user. */
-	sids := snapshot.ReadSummonerIds(*SUMMONER_FILE)[:3]
+	sids := snapshot.ReadSummonerIds(*SUMMONER_FILE)
 	sid_chan := make([]chan *gamelog.GameRecord, len(sids))
 	log.Println(fmt.Sprintf("Read %d summoners from champion list.", len(sids)))
 

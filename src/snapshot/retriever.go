@@ -48,8 +48,8 @@ func (r *Retriever) Init() {
  *
  * TODO: retrieve all games played in the two weeks before this date.
  */
-func (r *Retriever) GetGamesIter(date_str string) mgo.Iter {
-	games := make([]gamelog.GameRecord, 0, 100)
+func (r *Retriever) GetGamesIter(date_str string) *mgo.Iter {
+//	games := make([]gamelog.GameRecord, 0, 100)
 	start, end := ConvertTimestamp(date_str)
 
 	// TODO: this needs to use the same timestamp format as what's being
@@ -109,6 +109,10 @@ func (r *Retriever) SaveSnapshot(sid uint32, subset_name string, key string, ss 
 	record := SummonerRecord{}
 	r.summoner_collection.Find(bson.M{"_id": sid}).One(&record)
 
+	_, ok := record.Daily[key]
+	if !ok {
+		record.Daily = make(map[string]*PlayerSnapshot)
+	}
 	record.Daily[key] = ss
 	record.LastUpdated = (uint64)(time.Now().Unix())
 	r.summoner_collection.Update( bson.M{"_id": record.SummonerId}, record )

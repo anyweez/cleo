@@ -4,11 +4,12 @@ import (
 	"gamelog"
 )
 
+// TODO: Handle return values of NaN correctly.
+
 type SnapshotFunction func(snapshot *PlayerSnapshot, games []*gamelog.GameRecord) (string, float64, uint32)
 
 // List containing a bunch of pointers to functions. Each function will
-// be called on snapshots to generate a
-// TODO: this needs to be a list of functions
+// be called on snapshots to generate a stat.
 var Computations = make([]SnapshotFunction, 0, 10)
 
 func init() {
