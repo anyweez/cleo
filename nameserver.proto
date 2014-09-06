@@ -1,0 +1,10 @@
+package proto;
+
+message NameRequest {
+	optional string name = 1;
+}
+
+message NameResponse {
+	optional string name = 1;
+	optional uint32 id = 2;
+}
