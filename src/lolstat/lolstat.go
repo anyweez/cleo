@@ -110,7 +110,7 @@ func main() {
 	pcgl := read_pcgl("latest.pcgl")
 	log.Println("Read", len(pcgl.All), "events into PCGL.")
 
-	qm.Connect()
+	qm.Connect(14002)
 
 	// Kick off some goroutines that can handle queries.
 	for i := 0; i < 1; i++ {
