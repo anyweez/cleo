@@ -6,6 +6,7 @@ package snapshot
 
 type SummonerRecord struct {
         SummonerId	uint32 `json:"id" bson:"_id"`
+	SummonerName	string
 	LastUpdated	uint64
 	Daily		map[string]*PlayerSnapshot
 }

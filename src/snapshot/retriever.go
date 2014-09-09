@@ -129,3 +129,7 @@ func (r *Retriever) SaveSnapshot(sid uint32, subset_name string, key string, ss 
 	record.LastUpdated = (uint64)(time.Now().Unix())
 	r.summoner_collection.Update( bson.M{"_id": record.SummonerId}, record )
 }
+
+func (r *Retriever) UpdateSnapshot(ss *SummonerRecord) {
+	r.summoner_collection.Update( bson.M{"_id": ss.SummonerId}, ss )
+}
