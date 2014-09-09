@@ -53,12 +53,11 @@ func (q *QueryManager) Connect(port int) {
 		log.Fatal("Couldn't open port for listening.")
 	}
 
-	log.Println("Query server listening on port" + string(port))
+	log.Println(fmt.Sprintf("Query server listening on port %d",  port))
 }
 
 func (q *QueryManager) Listen(query_type gproto.Message) QueryRequest {
 	query := QueryRequest{}
-	log.Println("Awaiting request")
 
 	conn, _ := q.Switchboard.GetStream()
 	query.Conn = conn
@@ -68,13 +67,25 @@ func (q *QueryManager) Listen(query_type gproto.Message) QueryRequest {
 	merr := gproto.Unmarshal([]byte(msg[:len(msg)-1]), query_type)
 
 	if merr != nil {
-		log.Fatal("Error unmarshaling query.")
+		log.Fatal("Error unmarshaling query; are you sure you sending a properly formatted proto?")
 	}
 
 	query.Query = query_type
 	query.TimeReceived = time.Now().Unix()
 
 	return query
+}
+
+func (q *QueryManager) Reply(request *QueryRequest, response gproto.Message) {
+        defer (*request.Conn).Close()
+
+        data, _ := gproto.Marshal(response)
+
+        // Send the data back to the responder and decrement the # of active queries.
+        rw := bufio.NewReadWriter(bufio.NewReader(*request.Conn), bufio.NewWriter(*request.Conn))
+        rw.WriteString(string(data) + "|")
+        rw.Flush()
+        log.Println("response sent")
 }
 
 // TODO: get rid of await in favor of a more generic Listen

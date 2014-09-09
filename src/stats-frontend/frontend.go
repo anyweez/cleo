@@ -53,7 +53,7 @@ func lookup_summoner(name string) (uint32, bool) {
         data, _ := gproto.Marshal(&request)
         rw.WriteString(string(data) + "|")
         rw.Flush()
-        
+
         // Receive a response
         response := proto.NameResponse{}
         reply, _ := rw.ReadString('|')
@@ -74,16 +74,27 @@ func index_handler(w http.ResponseWriter, r *http.Request) {
         stat_request.Player.Name = name
         stat_request.Player.SummonerId = summoner_id
 
+	retriever := snapshot.Retriever{}
+	retriever.Init()
+
 	if valid {
-		retriever := snapshot.Retriever{}
-		retriever.Init()
+//		retriever := snapshot.Retriever{}
+//		retriever.Init()
 		// Make a request to the backend to get the snapshot data for
 		// this summoner.
 		stat_request.Records = retriever.GetSnapshots(summoner_id)
+		log.Println(stat_request.Records)
 	}
 
-	response_string, _ := json.Marshal(stat_request)
+	log.Println(stat_request)
+	response_string, jerr := json.Marshal(stat_request)
+
+	if jerr != nil {
+		log.Fatal("fatal error:", jerr)
+	}
+
 	w.Write( []byte(response_string) )
+	log.Println("Response sent")
 }
 
 func main() {

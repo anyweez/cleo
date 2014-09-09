@@ -2,7 +2,6 @@ package snapshot
 
 import (
 	"gamelog"
-	"math"
 )
 
 // TODO: Handle return values of NaN correctly.
@@ -25,7 +24,7 @@ func kda(snapshot *PlayerSnapshot, games []*gamelog.GameRecord) (string, float64
 	var num_kills uint32 = 0
 	var num_deaths uint32 = 0
 	var num_assists uint32 = 0
-	
+
 	for _, game := range games {
 		for _, team := range game.Teams {
 			for _, player := range team.Players {
@@ -37,8 +36,12 @@ func kda(snapshot *PlayerSnapshot, games []*gamelog.GameRecord) (string, float64
 			}
 		}
 	}
-	
-	return "kda", (float64)(num_kills + num_assists) / (float64)(num_deaths), 0
+
+	if num_deaths > 0 {
+		return "kda", (float64)(num_kills + num_assists) / (float64)(num_deaths), 0
+	} else {
+		return "kda", 0, 0
+	}
 }
 
 /**
@@ -58,9 +61,9 @@ func minionKills(snapshot *PlayerSnapshot, games []*gamelog.GameRecord) (string,
 			}
 		}
 	}
-	if num_set_games > 0 {
+	if num_set_games > 0 && len(games) > 0 {
 		return "minionKills", (float64)(num_minions) / (float64)(len(games)), 0
 	} else {
-		return "minionKills", math.NaN(), 0
+		return "minionKills", 0, 0
 	}
 }

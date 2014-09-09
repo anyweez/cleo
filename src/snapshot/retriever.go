@@ -6,6 +6,7 @@ package snapshot
  * business logic.
  */
  import (
+	"fmt"
 	"gamelog"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
@@ -27,16 +28,23 @@ package snapshot
  * 		Source: built from games table by join-summoners process
  * 		Purpose: summarized player stats
  */
-var session, _ = mgo.Dial("request.loltracker.com:27017")
+var session, serr = mgo.Dial("request.loltracker.com:27017")
 
 type Retriever struct {
 	games_collection	*mgo.Collection
 	summoner_collection	*mgo.Collection
+	initialized		bool
 }
 
 func (r *Retriever) Init() {
-    r.games_collection = session.DB("lolstat").C("games")
+	if serr != nil {
+		log.Fatal(fmt.Sprintf("Fatal error: %s", serr))
+	}
+
+	r.games_collection = session.DB("lolstat").C("games")
 	r.summoner_collection = session.DB("lolstat").C("summoners")
+
+	r.initialized = true
 }
 
 /***************
@@ -81,14 +89,19 @@ func (r *Retriever) NewSummoner(sid uint32) {
 }
 
 func (r *Retriever) GetSnapshotsIter() *mgo.Iter {
-	return r.summoner_collection.Find().Iter()
+	return r.summoner_collection.Find( bson.M{} ).Iter()
 }
 
 func (r *Retriever) GetSnapshots(sid uint32) SummonerRecord {
-	record := SummonerRecord{}
-	r.summoner_collection.Find( bson.M{"_id":sid} ).One(&record)
+	if !r.initialized {
+		r.Init()
+	}
 
-	return record
+	result := SummonerRecord{}
+	r.summoner_collection.Find( bson.M{"_id": sid} ).One(&result)
+
+
+	return result
 }
 
 func (r *Retriever) SaveSnapshot(sid uint32, subset_name string, key string, ss *PlayerSnapshot) {
