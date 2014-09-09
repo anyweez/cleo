@@ -27,7 +27,7 @@ package snapshot
  * 		Source: built from games table by join-summoners process
  * 		Purpose: summarized player stats
  */
-var session, _ = mgo.Dial("127.0.0.1:27017")
+var session, _ = mgo.Dial("request.loltracker.com:27017")
 
 type Retriever struct {
 	games_collection	*mgo.Collection
@@ -80,8 +80,15 @@ func (r *Retriever) NewSummoner(sid uint32) {
 	r.summoner_collection.Insert(record)
 }
 
-func (r *Retriever) GetSnapshots(sid uint32) {
+func (r *Retriever) GetSnapshotsIter() *mgo.Iter {
+	return r.summoner_collection.Find().Iter()
+}
 
+func (r *Retriever) GetSnapshots(sid uint32) SummonerRecord {
+	record := SummonerRecord{}
+	r.summoner_collection.Find( bson.M{"_id":sid} ).One(&record)
+
+	return record
 }
 
 func (r *Retriever) SaveSnapshot(sid uint32, subset_name string, key string, ss *PlayerSnapshot) {
