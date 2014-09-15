@@ -21,6 +21,7 @@ import (
 
 // Constants
 var API_KEY = flag.String("apikey", "", "Riot API key")
+var CHAMPION_LIST = flag.String("summoners", "champions", "List of summoner ID's")
 
 const STORE_RESPONSES = true
 
@@ -86,7 +87,7 @@ func read_summoner_ids(filename string) []uint32 {
 
 func load_starting_ids(cm *CandidateManager) {
 	// Load in a file full of summoner ID's.
-	summoner_ids := read_summoner_ids("champions")
+	summoner_ids := read_summoner_ids(*CHAMPION_LIST)
 	for _, sid := range summoner_ids {
 		cm.Add(sid)
 	}

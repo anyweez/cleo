@@ -31,7 +31,7 @@ func init() {
                 log.Fatal("Couldn't find any available backends.")
         } else {
 		log.Println("Connected to nameserver.")
-	} 
+	}
 }
 
 /**
@@ -62,8 +62,8 @@ func lookup_summoner(name string) (uint32, bool) {
 	return *response.Id, (*response.Id != 0)
 }
 
-func index_handler(w http.ResponseWriter, r *http.Request) {
-	log.Println("index requested")
+func summoner_handler(w http.ResponseWriter, r *http.Request) {
+	log.Println("summoner requested")
 
 	name := r.FormValue("name")
 	// Lookup the summoner ID from a lookup server.
@@ -78,8 +78,6 @@ func index_handler(w http.ResponseWriter, r *http.Request) {
 	retriever.Init()
 
 	if valid {
-//		retriever := snapshot.Retriever{}
-//		retriever.Init()
 		// Make a request to the backend to get the snapshot data for
 		// this summoner.
 		stat_request.Records = retriever.GetSnapshots(summoner_id)
@@ -97,24 +95,23 @@ func index_handler(w http.ResponseWriter, r *http.Request) {
 	log.Println("Response sent")
 }
 
+func index_handler(w http.ResponseWriter, r *http.Request) {
+	log.Println("index requested")
+
+	http.ServeFile(w, r, "html.stats/index.html")
+}
+
 func main() {
         http.HandleFunc("/", index_handler)
+        http.HandleFunc("/summoner/", summoner_handler)
 	// No-op handler for favicon.ico, since it'll otherwise generate an extra call to index_handler.
 	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {}) 
 //        http.HandleFunc("/summoner/", simple_summoner)
 
-        // Initialize the connection to the name lookup service
-//	conn, _ := net.ResolveTCPAddr("tcp", "lookup.loltracker.com:14003")
-//      lookup, cerr := switchboard.NewClient("tcp", conn)
-
-      //  if cerr != nil {
-      //          log.Fatal("Couldn't find any available backends.")
-      //  }
-
         // Serve any files in static/ directly from the filesystem.
         http.HandleFunc("/static/", func(w http.ResponseWriter, r *http.Request) {
                 log.Println("GET", r.URL.Path[1:])
-                http.ServeFile(w, r, "html/"+r.URL.Path[1:])
+                http.ServeFile(w, r, "html.stats/"+r.URL.Path[1:])
         })
 
         log.Println("Awaiting requests...")
