@@ -35,7 +35,7 @@ func update(who snapshot.SummonerRecord, retriever snapshot.Retriever) {
 
                 json.Unmarshal(body, &response)
 
-		for k, v := range response {
+		for _, v := range response {
 			who.SummonerName = v
 		}
 	}

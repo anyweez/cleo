@@ -1,0 +1,39 @@
+
+#search {
+	height: 100px;
+	text-align: center;
+}
+
+#summary {
+	width: 100%;
+	border: 1px solid black;
+}
+
+.summary-label {
+	text-align: center;
+	padding: 10px;
+	
+	border-bottom: 1px solid black;
+	background-color: #eee;
+}
+
+.summary-pane {
+	width: 18%;
+	
+	border: 2px solid black;
+	display: inline-block;
+	margin: .5%;
+}
+
+.summary-value {
+	font-size: 2em;
+	text-align: center;
+	padding: 4%;
+}
+
+.chart {
+/*	width: 100%; */
+	border: 1px solid black;
+/*	height: 600px; */
+	margin-top: 12px;
+}

@@ -1,0 +1,55 @@
+{
+	"KnownSummoner": true,
+	"Player": {
+		"Name": "Brigado",
+		"SummonerId": 36142441,
+		"Ranking": {
+			"Level": 3,
+			"League": 2
+		}
+	},
+	"Records": {
+		"Id": 0,
+		"SummonerName": "Brigado",
+		"LastUpdated": 0,
+		"Daily": {
+			"2014-09-04": {
+				"SummonerId": 36142441,
+				"GamesList": [1541925238, 1541867411],
+				"Stats": [{
+					"Name": "kda",
+					"Absolute": 12,
+					"Normalized": 0
+				}, {
+					"Name": "minionsKilled",
+					"Absolute": 97,
+					"Normalized": 0
+				}, {
+                                        "Name": "gamesPlayed",
+                                        "Absolute": 6,
+                                        "Normalized": 0
+                                }],
+				"CreationTimestamp": 0
+			},
+                        "2014-09-05": {
+                                "SummonerId": 36142441,
+                                "GamesList": [1541925238, 1541867411],
+                                "Stats": [{
+                                        "Name": "kda",
+                                        "Absolute": 16,
+                                        "Normalized": 0
+                                }, {
+                                        "Name": "minionsKilled",
+                                        "Absolute": 95,
+                                        "Normalized": 0
+                                },  {
+                                        "Name": "gamesPlayed",
+                                        "Absolute": 10,
+                                        "Normalized": 0
+                                }],
+                                "CreationTimestamp": 0
+                        }
+
+		}
+}
+}
