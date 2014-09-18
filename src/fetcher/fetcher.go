@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"gamelog"
-	"io"
 	"io/ioutil"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
@@ -85,9 +84,15 @@ func read_summoner_ids(filename string) []uint32 {
 	return lines
 }
 
+/**
+ * TODO: read this from Mongo and well as from CHAMPION_LIST.
+ */
 func load_starting_ids(cm *CandidateManager) {
 	// Load in a file full of summoner ID's.
 	summoner_ids := read_summoner_ids(*CHAMPION_LIST)
+	cm.Queue = make(chan uint32, len(summoner_ids))
+	cm.CandidateMap = make(map[uint32]bool)
+
 	for _, sid := range summoner_ids {
 		cm.Add(sid)
 	}
@@ -111,20 +116,13 @@ func main() {
 	}
 
 	fmt.Println("Initializing...")
+        session, _ := mgo.Dial("127.0.0.1:27017")
+	defer session.Close()
+        games_collection := session.DB("lolstat").C("games")
 
 	cm := CandidateManager{}
-	// TODO: can the queue length be dynamic? static is a problem
-	// because this will eventually fill up.
-	cm.Queue = make(chan uint32, 50000000)
-	cm.CandidateMap = make(map[uint32]bool)
-
-	// Connect to MongoDB instance.
-	session, _ := mgo.Dial("127.0.0.1:27017")
-	games_collection := session.DB("lolstat").C("games")
-	defer session.Close()
-
-	// Kick off some retrievers that will pull from the retrieval queue.
 	load_starting_ids(&cm)
+
 	fmt.Println(fmt.Sprintf("Loaded %d summoners...let's do this!", cm.Count()))
 
 	counter := 0
@@ -136,31 +134,8 @@ func main() {
 		time.Sleep(1100 * time.Millisecond)
 
 		// Push the player to the retrieval queue.
-		go retrieve(cm.Next(), games_collection, &cm)
+		go retrieve(cm.Next(), games_collection)
 		counter += 1
-
-		fmt.Print(fmt.Sprintf("Summoner queue size: %d [%.1f%% to next export]\r", cm.Count(), float32((counter%1000)/1000)))
-
-		// Run for approx 2 hrs then dump data.
-		if counter == 1000 && (*cpuprofile != "" || *memprofile != "") {
-			pprof.StopCPUProfile()
-
-			if *memprofile != "" {
-				mf, err := os.Create(*memprofile)
-				if err != nil {
-					log.Fatal(err)
-				}
-				pprof.WriteHeapProfile(mf)
-				mf.Close()
-			}
-
-			fmt.Println("Profiling complete")
-		}
-
-		// Every thousand requests save the new summoner list.
-		if (counter%1000 == 0) && STORE_RESPONSES {
-			write_candidates(&cm)
-		}
 	}
 }
 
@@ -171,7 +146,7 @@ func main() {
 //
 // Note that all rate limiting is handled directly by the channel, meaning
 // that everything in this goroutine can execute as quickly as possible.
-func retrieve(summoner uint32, collection *mgo.Collection, cm *CandidateManager) {
+func retrieve(summoner uint32, collection *mgo.Collection) {
 	// Retrieve game data.
 	url := "https://na.api.pvp.net/api/lol/na/v1.3/game/by-summoner/%d/recent?api_key=%s"
 	resp, err := http.Get(fmt.Sprintf(url, summoner, *API_KEY))
@@ -187,14 +162,6 @@ func retrieve(summoner uint32, collection *mgo.Collection, cm *CandidateManager)
 
 		// Write all games into permanent storage.
 		for _, game := range convert(&json_response) {
-			// Add all of the players to the candidate manager. It
-			// takes care of removing duplicates automatically.
-			for _, team := range game.Teams {
-				for _, player := range team.Players {
-					cm.Add(player.Player.SummonerId)
-				}
-			}
-
 			// Store everything per game
 			if STORE_RESPONSES {
 				// Check to see if the game already exists. If so, don't do anything.
@@ -242,15 +209,15 @@ func retrieve(summoner uint32, collection *mgo.Collection, cm *CandidateManager)
 					if found_target == 0 {
 						log.Println("Found matching game ID's with non-matching summoner ID's.")
 					}
-				}
-			}
+				} // end else
+			} // end STORE_RESPONSES block
 		} // end for
 	}
 }
 
 func timestampToQuickdate(ts uint64) uint32 {
 	num, _ := strconv.Atoi( time.Unix( (int64)(ts / 1000), 0).Format("20060102") )
-	
+
 	return (uint32)(num)
 }
 
@@ -338,6 +305,7 @@ func convert(response *JSONResponse) []gamelog.GameRecord {
 
 // Write out a list of all of the candidates we've found so far. This is
 // used to seed the list next time we load the fetcher.
+/*
 func write_candidates(cm *CandidateManager) {
 	t := time.Now()
 	filename := fmt.Sprintf("gamelogs/%s.summ", t.Local().Format("2006-01-02:15.04"))
@@ -348,3 +316,4 @@ func write_candidates(cm *CandidateManager) {
 		io.WriteString(f, strconv.FormatUint(uint64(k), 10)+"\n")
 	}
 }
+*/
