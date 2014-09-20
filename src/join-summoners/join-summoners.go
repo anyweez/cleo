@@ -47,11 +47,13 @@ func handle_summoner(sid uint32, input chan *gamelog.GameRecord, done chan bool)
 	result := gamelog.GameRecord{}
 
 	for iter.Next(&result) {
+		log.Println(fmt.Sprintf("Found game: %d", result.GameId))
 		keeper := false
 		for _, team := range result.Teams {
 			for _, player := range team.Players {
 				if player.Player.SummonerId == sid {
 					keeper = true
+					log.Println(fmt.Sprintf("Game found: %d", result.GameId))
 				}
 			}
 		}

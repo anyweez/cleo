@@ -64,7 +64,8 @@ func (r *Retriever) GetGamesIter(date_str string) *mgo.Iter {
 
 	// TODO: this needs to use the same timestamp format as what's being
 	// stored, which is a millisecond-based UNIX timestamp.	
-	query := r.games_collection.Find(bson.M{"quickdate": start_str})
+	// 'q' is the database-side name for the "quickdate" field.
+	query := r.games_collection.Find(bson.M{"q": start_str})
 	return query.Iter()
 }
 
