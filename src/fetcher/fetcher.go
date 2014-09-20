@@ -164,7 +164,6 @@ func retrieve(summoner uint32, collection *mgo.Collection) {
 		for _, game := range convert(&json_response) {
 			// Store everything per game
 			if STORE_RESPONSES {
-				log.Println(game.GameId)
 				// Check to see if the game already exists. If so, don't do anything.
 				record_count, _ := collection.Find(bson.M{"_id": game.GameId}).Count()
 
