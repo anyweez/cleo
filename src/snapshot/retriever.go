@@ -7,7 +7,6 @@ package snapshot
  */
  import (
 	"fmt"
-	"gamelog"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
 	"log"
@@ -72,7 +71,7 @@ func (r *Retriever) GetGamesIter(date_str string) *mgo.Iter {
 /**
  * Add a game to the game log.
  */
-func (r *Retriever) SaveGame(record *gamelog.GameRecord) {
+func (r *Retriever) SaveGame(record *data.GameRecord) {
 
 }
 
