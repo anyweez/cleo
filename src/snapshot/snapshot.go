@@ -1,12 +1,12 @@
 package snapshot
 
 import (
-	"gamelog"
+	data "datamodel"
 )
 
 // TODO: Handle return values of NaN correctly.
 
-type SnapshotFunction func(snapshot *PlayerSnapshot, games []*gamelog.GameRecord) (string, float64, uint32)
+type SnapshotFunction func(snapshot *data.PlayerSnapshot, games []*data.GameRecord) (string, float64, uint32)
 
 // List containing a bunch of pointers to functions. Each function will
 // be called on snapshots to generate a stat.
@@ -20,7 +20,7 @@ func init() {
 /**
  * Computes the mean KDA for a given snapshot.
  */
-func kda(snapshot *PlayerSnapshot, games []*gamelog.GameRecord) (string, float64, uint32) {
+func kda(snapshot *data.PlayerSnapshot, games []*data.GameRecord) (string, float64, uint32) {
 	var num_kills uint32 = 0
 	var num_deaths uint32 = 0
 	var num_assists uint32 = 0
@@ -47,7 +47,7 @@ func kda(snapshot *PlayerSnapshot, games []*gamelog.GameRecord) (string, float64
 /**
  * Computes the mean # of minion kills for a given snapshot.
  */
-func minionKills(snapshot *PlayerSnapshot, games []*gamelog.GameRecord) (string, float64, uint32) {
+func minionKills(snapshot *data.PlayerSnapshot, games []*data.GameRecord) (string, float64, uint32) {
 	var num_minions uint32 = 0
 	var num_set_games = 0
 

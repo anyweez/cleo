@@ -1,13 +1,13 @@
 package main
 
 import (
+	data "datamodel"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"io/ioutil"
 	"encoding/json"
-	"snapshot"
 	"time"
 )
 
@@ -20,7 +20,7 @@ import (
 
 var API_KEY = flag.String("apikey", "", "Riot API key")
 
-func update(who snapshot.SummonerRecord, retriever snapshot.Retriever) {
+func update(who *data.SummonerRecord, retriever *data.LoLRetriever) {
 	log.Println("Looking up name for summoner #", who.SummonerId)
 	url := "https://na.api.pvp.net/api/lol/na/v1.4/summoner/%d/name?api_key=%s"
 
@@ -40,25 +40,28 @@ func update(who snapshot.SummonerRecord, retriever snapshot.Retriever) {
 		}
 	}
 
-	retriever.UpdateSnapshot(&who)
+	retriever.StoreSummoner(who)
 }
-
 
 func main() {
 	flag.Parse()
 
-	retriever := snapshot.Retriever{}
-	retriever.Init()
+	retriever := data.LoLRetriever{}
 
 	for {
-		// Fetch all summoners.
-		iter := retriever.GetSnapshotsIter()
-		result := snapshot.SummonerRecord{}
-		for iter.Next(&result) {
-			// If the summoner name is not set, let's look it up.
-			if len(result.SummonerName) == 0 {
-				go update(result, retriever)
-				time.Sleep(1100 * time.Millisecond)
+		summoners_iter := retriever.GetAllSummonersIter()
+		
+		for summoners_iter.HasNext() {
+			summoner := summoners_iter.Next()
+	
+			for summoner.SummonerId != 0 {
+				// If the summoner name is not set, let's look it up.
+                if len(summoner.SummonerName) == 0 {
+					go update(&summoner, &retriever)
+                    time.Sleep(1100 * time.Millisecond)
+				}
+
+				summoner = summoners_iter.Next()
 			}
 		}
 

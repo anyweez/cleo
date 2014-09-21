@@ -1,18 +1,15 @@
 package main
 
 import (
-	"bufio"
+	data "datamodel"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"gamelog"
 	"io/ioutil"
-	"labix.org/v2/mgo"
-	"labix.org/v2/mgo/bson"
 	"log"
+	"log/syslog"
+	"lolutil"
 	"net/http"
-	"os"
-	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
@@ -24,104 +21,20 @@ var CHAMPION_LIST = flag.String("summoners", "champions", "List of summoner ID's
 
 const STORE_RESPONSES = true
 
-// Flags
-var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
-var memprofile = flag.String("memprofile", "", "write memory profile to this file")
-
-//////////////////////////////////////////////////////////////////
-//// CandidateManager keeps track of a list of Players that can be fetched
-//// and ensures that they're all unique in the queue.
-//////////////////////////////////////////////////////////////////
-type CandidateManager struct {
-	Queue        chan uint32
-	CandidateMap map[uint32]bool
-
-	count uint32
-}
-
-func (cm *CandidateManager) Add(player uint32) {
-	_, exists := cm.CandidateMap[player]
-	if !exists {
-		cm.CandidateMap[player] = true
-		cm.count += 1
-
-		cm.Queue <- player
-	}
-}
-
-func (cm *CandidateManager) Next() uint32 {
-	player := <-cm.Queue
-	// Cycle the candidate back into the queue.
-	cm.Queue <- player
-
-	return player
-}
-
-func (cm *CandidateManager) Count() uint32 {
-	return cm.count
-}
-
-// This function reads in a list of champions from a local file to start
-// as the seeding set. The fetcher will automatically include new champions
-// it discovers on its journey as well.
-func read_summoner_ids(filename string) []uint32 {
-	// Read the specified file.
-	file, err := os.Open(filename)
-	if err != nil {
-		log.Fatal("Cannot find champions file.")
-	}
-	defer file.Close()
-
-	lines := make([]uint32, 0, 10000)
-	scanner := bufio.NewScanner(file)
-
-	for scanner.Scan() {
-		value, _ := strconv.ParseUint(scanner.Text(), 10, 32)
-		lines = append(lines, uint32(value))
-	}
-
-	// Return a set of summoner ID's.
-	return lines
-}
-
-/**
- * TODO: read this from Mongo and well as from CHAMPION_LIST.
- */
-func load_starting_ids(cm *CandidateManager) {
-	// Load in a file full of summoner ID's.
-	summoner_ids := read_summoner_ids(*CHAMPION_LIST)
-	cm.Queue = make(chan uint32, len(summoner_ids))
-	cm.CandidateMap = make(map[uint32]bool)
-
-	for _, sid := range summoner_ids {
-		cm.Add(sid)
-	}
-}
+var logger, _ = syslog.New(syslog.LOG_INFO, "fetcher")
 
 func main() {
 	// Flag setup
 	flag.Parse()
-	if *cpuprofile != "" {
-		fmt.Println("Starting CPU profiling...")
-		cf, err := os.Create(*cpuprofile)
-		if err != nil {
-			log.Fatal(err)
-		}
-		pprof.StartCPUProfile(cf)
-		defer pprof.StopCPUProfile()
-	}
 
 	if *API_KEY == "" {
 		log.Fatal("You must provide an API key using the -apikey flag.")
 	}
 
 	fmt.Println("Initializing...")
-        session, _ := mgo.Dial("127.0.0.1:27017")
-	defer session.Close()
-        games_collection := session.DB("lolstat").C("games")
+	retriever := data.LoLRetriever{}
 
-	cm := CandidateManager{}
-	load_starting_ids(&cm)
+	cm := lolutil.LoadCandidates(retriever, *CHAMPION_LIST)
 
 	fmt.Println(fmt.Sprintf("Loaded %d summoners...let's do this!", cm.Count()))
 
@@ -134,7 +47,7 @@ func main() {
 		time.Sleep(1100 * time.Millisecond)
 
 		// Push the player to the retrieval queue.
-		go retrieve(cm.Next(), games_collection)
+		go retrieve(cm.Next(), &retriever)
 		counter += 1
 	}
 }
@@ -146,7 +59,7 @@ func main() {
 //
 // Note that all rate limiting is handled directly by the channel, meaning
 // that everything in this goroutine can execute as quickly as possible.
-func retrieve(summoner uint32, collection *mgo.Collection) {
+func retrieve(summoner uint32, retriever *data.LoLRetriever) {
 	// Retrieve game data.
 	url := "https://na.api.pvp.net/api/lol/na/v1.3/game/by-summoner/%d/recent?api_key=%s"
 	resp, err := http.Get(fmt.Sprintf(url, summoner, *API_KEY))
@@ -165,20 +78,18 @@ func retrieve(summoner uint32, collection *mgo.Collection) {
 			// Store everything per game
 			if STORE_RESPONSES {
 				// Check to see if the game already exists. If so, don't do anything.
-				record_count, _ := collection.Find(bson.M{"_id": game.GameId}).Count()
+				record, exists := retriever.GetGame(game.GameId)
 
 				// Insert a new record.
-				if record_count == 0 {
+				if !exists {
 					game.MergeCount = 1
 					// Encode and store in the database.
-					collection.Insert(game)
+					retriever.StoreGame(&game)
 				} else {
 					// Otherwise merge with a pre-existing record.
 					// TODO: add a lock to make sure the response we retrieve doesn't go stale before we
 					//   update it.
-					record := gamelog.GameRecord{}
-					collection.Find(bson.M{"_id": game.GameId}).One(&record)
-
+					
 					// A ridiculously nested loop that compares players in the stored game record with
 					// players from the new record and merges them if it finds overlap (should be exactly
 					// one player). The found_player variable is used to confirm that only one player
@@ -198,7 +109,7 @@ func retrieve(summoner uint32, collection *mgo.Collection) {
 											// Increment the counter for the number of players that have
 											// been merged into this game record.
 											record.MergeCount += 1
-											collection.Update(bson.M{"_id": game.GameId}, record)
+											retriever.StoreGame(&game)
 										}
 									}
 								}
@@ -226,8 +137,8 @@ func timestampToQuickdate(ts uint64) uint32 {
 // This function converts Riot's JSON format into GameLog entries which
 // are used for everything internally. Note that certain fields are
 // dropped here at the moment.
-func convert(response *JSONResponse) []gamelog.GameRecord {
-	games := make([]gamelog.GameRecord, 0, 10)
+func convert(response *JSONResponse) []data.GameRecord {
+	games := make([]data.GameRecord, 0, 10)
 
 	for _, game := range response.Games {
 		// Only keep games that are matched 5v5 (no bot games, etc).
@@ -235,20 +146,20 @@ func convert(response *JSONResponse) []gamelog.GameRecord {
 			continue
 		}
 
-		record := gamelog.GameRecord{}
+		record := data.GameRecord{}
 
 		record.Timestamp = game.CreateDate
 		record.QuickDate = timestampToQuickdate(record.Timestamp)
 		record.GameId = game.GameId
 
-		team1 := gamelog.Team{}
-		team2 := gamelog.Team{}
+		team1 := data.Team{}
+		team2 := data.Team{}
 
 		// Add the target player and set the outcome.
-		plyr := gamelog.PlayerType{}
+		plyr := data.PlayerType{}
 		plyr.SummonerId = response.SummonerId
 
-		pstats := gamelog.PlayerStats{}
+		pstats := data.PlayerStats{}
 		pstats.Champion = game.ChampionId
 		pstats.Player = &plyr
 
@@ -277,8 +188,8 @@ func convert(response *JSONResponse) []gamelog.GameRecord {
 		// Add all fellow players. Note that we only get stats for the player that we're
 		// querying for.
 		for _, player := range game.FellowPlayers {
-			plyr := gamelog.PlayerType{}
-			fellow_stats := gamelog.PlayerStats{}
+			plyr := data.PlayerType{}
+			fellow_stats := data.PlayerStats{}
 
 			plyr.SummonerId = player.SummonerId
 			fellow_stats.Champion = player.ChampionId
@@ -302,18 +213,3 @@ func convert(response *JSONResponse) []gamelog.GameRecord {
 
 	return games
 }
-
-// Write out a list of all of the candidates we've found so far. This is
-// used to seed the list next time we load the fetcher.
-/*
-func write_candidates(cm *CandidateManager) {
-	t := time.Now()
-	filename := fmt.Sprintf("gamelogs/%s.summ", t.Local().Format("2006-01-02:15.04"))
-	f, _ := os.Create(filename)
-	defer f.Close()
-
-	for k, _ := range cm.CandidateMap {
-		io.WriteString(f, strconv.FormatUint(uint64(k), 10)+"\n")
-	}
-}
-*/

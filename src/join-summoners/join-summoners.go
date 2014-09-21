@@ -10,10 +10,11 @@ package main
  */
 
 import (
+	data "datamodel"
 	"flag"
 	"fmt"
-	"gamelog"
 	"log"
+	"lolutil"
 	"snapshot"
 	"strings"
 	"sync"
@@ -32,28 +33,29 @@ var MAX_CONCURRENT_GR = flag.Int("max_concurrent", 100, "The number of simultane
  * target summoner ID. It then condenses them into a single PlayerSnapshot
  * and saves it to MongoDB.
  */
-func handle_summoner(sid uint32, input chan *gamelog.GameRecord, done chan bool) {
-	games := make([]*gamelog.GameRecord, 0, 10)
+func handle_summoner(sid uint32, input chan *data.GameRecord, done chan bool) {
+	games := make([]*data.GameRecord, 0, 10)
 	game_ids := make([]uint64, 0, 10)
 	
 	// Keep reading from the channel until nil comes through, then we're
 	// done receiving info. If the summoner this goroutine is responsible
 	// for played in the game, keep it. Otherwise forget about it.
-	
-	retriever := snapshot.Retriever{}
-	retriever.Init()
-	
-	iter := retriever.GetGamesIter(*TARGET_DATE)
-	result := gamelog.GameRecord{}
+	retriever := data.LoLRetriever{}
+	games_iter := retriever.GetQuickdateGamesIter(*TARGET_DATE)
 
-	for iter.Next(&result) {
-		log.Println(fmt.Sprintf("Found game: %d", result.GameId))
+	for games_iter.HasNext() {
+		result := games_iter.Next()
+
+		// Skip this record if the gameid is zero.
+		if result.GameId == 0 {
+			continue
+		}
+		
 		keeper := false
 		for _, team := range result.Teams {
 			for _, player := range team.Players {
 				if player.Player.SummonerId == sid {
 					keeper = true
-					log.Println(fmt.Sprintf("Game found: %d", result.GameId))
 				}
 			}
 		}
@@ -66,25 +68,38 @@ func handle_summoner(sid uint32, input chan *gamelog.GameRecord, done chan bool)
 
 	// Now all games have been processed. We need to save the set of
 	// games to a PlayerSnapshot for today.
-	snap := snapshot.PlayerSnapshot{}
+	snap := data.PlayerSnapshot{}
 
 	snap.CreationTimestamp = (uint64)(time.Now().Unix())
 	snap.SummonerId = (uint32)(sid)
 	snap.GamesList = game_ids
 
-	snap.Stats = make([]snapshot.PlayerStat, 0, 10)
+	snap.Stats = make([]data.PlayerStat, 0, 10)
 
 	// Update each snapshot with new computations.
 	for _, comp := range snapshot.Computations {
-		sv := snapshot.PlayerStat{}
+		sv := data.PlayerStat{}
 		sv.Name, sv.Absolute, sv.Normalized = comp(&snap, games)
 		
 		snap.Stats = append(snap.Stats, sv)
 	}
 
-	retriever.SaveSnapshot(sid, "daily", *TARGET_DATE, &snap)
-	log.Println(fmt.Sprintf("Saved daily snapshot for summoner #%d on %s", sid, *TARGET_DATE))
-	
+	// Fetch the summoner that this applies to.
+	summoner, exists := retriever.GetSummoner(sid)
+
+	if !exists {
+		log.Println("WARNING: Couldn't find summoner #", sid)
+	} else {
+		// Append the snapshot.
+		if summoner.Daily == nil {
+			summoner.Daily = make(map[string]*data.PlayerSnapshot)
+		}
+		summoner.Daily[*TARGET_DATE] = &snap
+		// Store the revised summoner.
+		retriever.StoreSummoner(&summoner)
+
+		log.Println(fmt.Sprintf("Saved daily snapshot for summoner #%d on %s", sid, *TARGET_DATE))
+	}
 	done <- true
 	GR_GROUP.Done()
 }
@@ -106,11 +121,6 @@ func main() {
 	for i := 0; i < *MAX_CONCURRENT_GR; i++ {
 		running_queue <- true
 	}
-	
-	// Check to make sure that a file was provided.
-	if len(*SUMMONER_FILE) == 0 {
-		log.Fatal("You must specify a list of summoner ID's with the --summoners flag")
-	}
 
 	// Basic format test for the target string. Making this a regex would be better.
 	if len(strings.Split(*TARGET_DATE, "-")) != 3 {
@@ -118,18 +128,19 @@ func main() {
 	}
 
 	/* Read in the list of summoner ID's from a file provided by the user. */
-	sids := snapshot.ReadSummonerIds(*SUMMONER_FILE)
-	sid_chan := make([]chan *gamelog.GameRecord, len(sids))
-	log.Println(fmt.Sprintf("Read %d summoners from champion list.", len(sids)))
+	retriever := data.LoLRetriever{}
+	cm := lolutil.LoadCandidates(retriever, *SUMMONER_FILE)
+	sid_chan := make([]chan *data.GameRecord, cm.Count())
+	log.Println(fmt.Sprintf("Read %d summoners from champion list.", cm.Count()))
 
 	/* Create a bunch of goroutines, one per summoner, that can be used
 	 * to filter records. */
-	for i, sid := range sids {
+	for i := 0; i < (int)(cm.Count()); i++ {
 		<- running_queue
-		sid_chan[i] = make(chan *gamelog.GameRecord)
+		sid_chan[i] = make(chan *data.GameRecord)
 
 		GR_GROUP.Add(1)		
-		go handle_summoner(sid, sid_chan[i], running_queue)
+		go handle_summoner(cm.Next(), sid_chan[i], running_queue)
 	}
 
 	// Wait for all goroutines to finish up before exiting.
