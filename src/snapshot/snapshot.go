@@ -3,10 +3,9 @@ package snapshot
 import (
 	data "datamodel"
 )
-
 // TODO: Handle return values of NaN correctly.
 
-type SnapshotFunction func(snapshot *data.PlayerSnapshot, games []*data.GameRecord) (string, float64, uint32)
+type SnapshotFunction func(snapshot data.PlayerSnapshot, games []*data.GameRecord) (string, data.Metric)
 
 // List containing a bunch of pointers to functions. Each function will
 // be called on snapshots to generate a stat.
@@ -20,7 +19,7 @@ func init() {
 /**
  * Computes the mean KDA for a given snapshot.
  */
-func kda(snapshot *data.PlayerSnapshot, games []*data.GameRecord) (string, float64, uint32) {
+func kda(snapshot data.PlayerSnapshot, games []*data.GameRecord) (string, data.Metric) {
 	var num_kills uint32 = 0
 	var num_deaths uint32 = 0
 	var num_assists uint32 = 0
@@ -38,16 +37,16 @@ func kda(snapshot *data.PlayerSnapshot, games []*data.GameRecord) (string, float
 	}
 
 	if num_deaths > 0 {
-		return "kda", (float64)(num_kills + num_assists) / (float64)(num_deaths), 0
+		return "kda", data.SimpleNumberMetric{ (float64)(num_kills + num_assists) / (float64)(num_deaths) }
 	} else {
-		return "kda", 0, 0
+		return "kda", data.SimpleNumberMetric{}
 	}
 }
 
 /**
  * Computes the mean # of minion kills for a given snapshot.
  */
-func minionKills(snapshot *data.PlayerSnapshot, games []*data.GameRecord) (string, float64, uint32) {
+func minionKills(snapshot data.PlayerSnapshot, games []*data.GameRecord) (string, data.Metric) {
 	var num_minions uint32 = 0
 	var num_set_games = 0
 
@@ -62,8 +61,8 @@ func minionKills(snapshot *data.PlayerSnapshot, games []*data.GameRecord) (strin
 		}
 	}
 	if num_set_games > 0 && len(games) > 0 {
-		return "minionKills", (float64)(num_minions) / (float64)(len(games)), 0
+		return "minionKills", data.SimpleNumberMetric{(float64)(num_minions) / (float64)(len(games)) }
 	} else {
-		return "minionKills", 0, 0
+		return "minionKills", data.SimpleNumberMetric{}
 	}
 }

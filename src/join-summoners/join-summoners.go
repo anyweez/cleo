@@ -6,7 +6,7 @@ package main
  * key that contains a bunch of records with summary stats for a
  * given day.
  *
- * ./join-summoners --date=2014-08-07 --summoners=data/summoners/0001.list
+ * ./join-summoners --date=2014-08-07
  */
 
 import (
@@ -74,32 +74,34 @@ func handle_summoner(sid uint32, input chan *data.GameRecord, done chan bool) {
 	snap.SummonerId = (uint32)(sid)
 	snap.GamesList = game_ids
 
-	snap.Stats = make([]data.PlayerStat, 0, 10)
+	snap.Stats = make(map[string]data.Metric)
 
 	// Update each snapshot with new computations.
 	for _, comp := range snapshot.Computations {
-		sv := data.PlayerStat{}
-		sv.Name, sv.Absolute, sv.Normalized = comp(&snap, games)
-		
-		snap.Stats = append(snap.Stats, sv)
+		name, metric := comp(snap, games)
+		snap.Stats[name] = metric
 	}
 
 	// Fetch the summoner that this applies to.
 	summoner, exists := retriever.GetSummoner(sid)
 
+	// If the summoner doesn't exist, create it.
 	if !exists {
-		log.Println("WARNING: Couldn't find summoner #", sid)
-	} else {
-		// Append the snapshot.
-		if summoner.Daily == nil {
-			summoner.Daily = make(map[string]*data.PlayerSnapshot)
-		}
-		summoner.Daily[*TARGET_DATE] = &snap
-		// Store the revised summoner.
-		retriever.StoreSummoner(&summoner)
-
-		log.Println(fmt.Sprintf("Saved daily snapshot for summoner #%d on %s", sid, *TARGET_DATE))
+		log.Println(fmt.Sprintf("Notice: Couldn't find summoner #%d; creating new instance.", sid)		)
+		summoner = data.SummonerRecord{}
+		summoner.SummonerId = sid
 	}
+	
+	// Append the snapshot.
+	if summoner.Daily == nil {
+		summoner.Daily = make(map[string]*data.PlayerSnapshot)
+	}
+
+	summoner.Daily[*TARGET_DATE] = &snap
+	// Store the revised summoner.
+	retriever.StoreSummoner(&summoner)
+	log.Println(fmt.Sprintf("Saved daily snapshot for summoner #%d on %s", sid, *TARGET_DATE))
+	
 	done <- true
 	GR_GROUP.Done()
 }

@@ -25,18 +25,22 @@ func update(who *data.SummonerRecord, retriever *data.LoLRetriever) {
 	url := "https://na.api.pvp.net/api/lol/na/v1.4/summoner/%d/name?api_key=%s"
 
 	resp, err := http.Get(fmt.Sprintf(url, who.SummonerId, *API_KEY))
-        response := make(map[string]string)
+    response := make(map[string]string)
 
-        if err != nil {
-                log.Println("Error retrieving data:", err)
-        } else {
-                defer resp.Body.Close()
-                body, _ := ioutil.ReadAll(resp.Body)
+    if err != nil {
+		log.Println("Error retrieving data:", err)
+    } else {
+		defer resp.Body.Close()
+        body, _ := ioutil.ReadAll(resp.Body)
 
-                json.Unmarshal(body, &response)
+        json.Unmarshal(body, &response)
 
+		empty := data.SummonerMetadata{}
 		for _, v := range response {
-			who.SummonerName = v
+			if who.Metadata == empty {
+				who.Metadata = data.SummonerMetadata{}
+			}
+			who.Metadata.SummonerName = v
 		}
 	}
 
@@ -45,6 +49,10 @@ func update(who *data.SummonerRecord, retriever *data.LoLRetriever) {
 
 func main() {
 	flag.Parse()
+
+	if *API_KEY == "" {
+		log.Fatal("You must provide an API key using the -apikey flag.")
+	}
 
 	retriever := data.LoLRetriever{}
 

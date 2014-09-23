@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"log/syslog"
+	"logger"
 	"lolutil"
 	"net/http"
 	"strconv"
@@ -18,10 +19,9 @@ import (
 // Constants
 var API_KEY = flag.String("apikey", "", "Riot API key")
 var CHAMPION_LIST = flag.String("summoners", "champions", "List of summoner ID's")
+var logs = logger.LoLLogger{}
 
 const STORE_RESPONSES = true
-
-var logger, _ = syslog.New(syslog.LOG_INFO, "fetcher")
 
 func main() {
 	// Flag setup
@@ -123,6 +123,12 @@ func retrieve(summoner uint32, retriever *data.LoLRetriever) {
 				} // end else
 			} // end STORE_RESPONSES block
 		} // end for
+		logs.Log( logger.LoLLogEvent{ 
+			Priority: syslog.LOG_INFO, 
+			Operation: logger.FETCH_MATCH_HISTORY,
+			Outcome: logger.SUCCESS,
+			Target: (uint64)(summoner),
+		} )
 	}
 }
 

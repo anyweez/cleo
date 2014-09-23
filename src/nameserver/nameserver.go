@@ -1,12 +1,12 @@
 package main
 
 import (
+	data "datamodel"
 	"fmt"
 	gproto "code.google.com/p/goprotobuf/proto"
 	"log"
 	"proto"
 	"query"
-	"snapshot"
 	"strings"
 )
 
@@ -16,20 +16,22 @@ import (
  * user-retrievable.
  */
 func load_summoners() map[string]uint32 {
-	retriever := snapshot.Retriever{}
-	retriever.Init()
+	retriever := data.LoLRetriever{}
 
-	iter := retriever.GetSnapshotsIter()
+	summoners_iter := retriever.GetKnownSummonersIter()
 	summoners := make(map[string]uint32)
 
-	snap := snapshot.SummonerRecord{}
-	for iter.Next(&snap) {
-		if len(snap.SummonerName) > 9 {
-			summoners[strings.ToLower(snap.SummonerName)] = snap.SummonerId
+	for summoners_iter.HasNext() {
+		summoner := summoners_iter.Next()
+		
+		// If we've got a valid summoner and their name is set, store it
+		// in the lookup table.
+		if summoner.SummonerId > 0 && len(summoner.Metadata.SummonerName) > 0 {
+			summoners[strings.ToLower(summoner.Metadata.SummonerName)] = summoner.SummonerId
 		}
 	}
+	
 	summoners["brigado"] = 36142441
-
 	return summoners
 }
 

@@ -15,6 +15,13 @@ type SummonerRecord struct {
         Metadata				SummonerMetadata
 }
 
+type Metric interface {
+}
+
+type SimpleNumberMetric struct {
+		Value	float64
+}
+
 /**
  * An individual snapshot for a summoner. Snapshots represent summaries of gameplay during a time range.
  */
@@ -24,20 +31,22 @@ type PlayerSnapshot struct {
         // TODO: add rank to this snapshot
 
         // The relevant gameplay statistics for the period covered by this snapshot
-        Stats                   []PlayerStat                            `bson:"t"`
+        Stats                   map[string]Metric                      `bson:"t"`
 
         // When this record was generated.
         CreationTimestamp       uint64                                  `bson:"c"`
 }
 
+
 /**
  * An individual statistic in a snapshot.
  */
+/*
 type PlayerStat struct {
         Name            string                                                  `bson:"n"`
         Absolute        float64                                         `bson:"a"`
         Normalized      uint32                                                  `bson:"o"`
-}
+}*/
 
 type SummonerMetadata struct {
 	SummonerId		uint32			`bson:"_id"`

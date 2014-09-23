@@ -338,6 +338,7 @@ func (r *LoLRetriever) StoreSummoner(summoner *SummonerRecord) {
 	// Store primary data struct in summoners collection
 	// Store name in summonerdata collection
 	r.init()
+	summoner.LastUpdated = (uint64)(time.Now().Unix())
 	
 	_, exists := r.GetSummoner(summoner.SummonerId)
 	
@@ -352,7 +353,7 @@ func (r *LoLRetriever) StoreSummoner(summoner *SummonerRecord) {
 	// does not check to see if there have been any changes.
 	empty := SummonerMetadata{}
 	if summoner.Metadata != empty {
-		r.storeSummonerMetadata(summoner.Metadata)
+		r.storeSummonerMetadata(summoner)
 	}
 }
 
@@ -384,14 +385,15 @@ func (r *LoLRetriever) getSummonerMetadata(sid uint32) (SummonerMetadata, bool) 
 	}
 }
 
-func (r *LoLRetriever) storeSummonerMetadata(smd SummonerMetadata) {
+func (r *LoLRetriever) storeSummonerMetadata(summ *SummonerRecord) {
 	r.init()
 	
-	_, exists := r.getSummonerMetadata(smd.SummonerId)
+	summ.Metadata.SummonerId = summ.SummonerId
+	_, exists := r.getSummonerMetadata(summ.SummonerId)
 	
 	if exists {
-		r.summoner_md.collection.Update(bson.M{"_id": smd.SummonerId}, smd)
+		r.summoner_md.collection.Update(bson.M{"_id": summ.SummonerId}, summ.Metadata)
 	} else {
-		r.summoner_md.collection.Insert(smd)
+		r.summoner_md.collection.Insert(summ.Metadata)
 	}
 }
