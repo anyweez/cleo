@@ -12,7 +12,9 @@ type SummonerRecord struct {
         SummonerName    string                                          `bson:"s"`
         LastUpdated             uint64                                          `bson:"l"`
         Daily                   map[string]*PlayerSnapshot      `bson:"d"`
-        Metadata				SummonerMetadata
+        Weekly					map[string]*PlayerSnapshot		`bson:"w"`
+        Monthly					map[string]*PlayerSnapshot		`bson:"m"`
+        Metadata				SummonerMetadata				`bson:"e"`
 }
 
 type Metric interface {

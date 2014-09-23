@@ -37,6 +37,15 @@ func (cm *CandidateManager) Next() uint32 {
 	return player
 }
 
+func (cm *CandidateManager) Pop() uint32 {
+	if cm.Count() == 0 {
+		return 0
+	}
+	
+	cm.count -= 1
+	return <- cm.Queue
+}
+
 func (cm *CandidateManager) Count() uint32 {
 	return cm.count
 }

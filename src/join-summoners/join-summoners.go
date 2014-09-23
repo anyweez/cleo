@@ -10,22 +10,20 @@ package main
  */
 
 import (
+	beanstalk "github.com/iwanbk/gobeanstalk"
 	data "datamodel"
 	"flag"
+	gproto "code.google.com/p/goprotobuf/proto"
 	"fmt"
 	"log"
-	"lolutil"
+	"proto"
 	"snapshot"
-	"strings"
+	"sort"
 	"sync"
 	"time"
 )
 
-var SUMMONER_FILE = flag.String("summoners", "", "The filename containing a list of summoner ID's.")
-var TARGET_DATE = flag.String("date", "0000-00-00", "The date to join in YYYY-MM-DD form.")
-
 var GR_GROUP sync.WaitGroup
-var MAX_CONCURRENT_GR = flag.Int("max_concurrent", 100, "The number of simultaneous summoners that will be examined.")
 
 /**
  * Goroutine that generates a report for a single summoner ID. It reads
@@ -33,7 +31,7 @@ var MAX_CONCURRENT_GR = flag.Int("max_concurrent", 100, "The number of simultane
  * target summoner ID. It then condenses them into a single PlayerSnapshot
  * and saves it to MongoDB.
  */
-func handle_summoner(sid uint32, input chan *data.GameRecord, done chan bool) {
+func handle_summoner(request proto.JoinRequest, sid uint32) {
 	games := make([]*data.GameRecord, 0, 10)
 	game_ids := make([]uint64, 0, 10)
 	
@@ -41,28 +39,31 @@ func handle_summoner(sid uint32, input chan *data.GameRecord, done chan bool) {
 	// done receiving info. If the summoner this goroutine is responsible
 	// for played in the game, keep it. Otherwise forget about it.
 	retriever := data.LoLRetriever{}
-	games_iter := retriever.GetQuickdateGamesIter(*TARGET_DATE)
+	
+	for _, qd := range request.Quickdates {
+		games_iter := retriever.GetQuickdateGamesIter(qd)
 
-	for games_iter.HasNext() {
-		result := games_iter.Next()
+		for games_iter.HasNext() {
+			result := games_iter.Next()
 
-		// Skip this record if the gameid is zero.
-		if result.GameId == 0 {
-			continue
-		}
+			// Skip this record if the gameid is zero.
+			if result.GameId == 0 {
+				continue
+			}
 		
-		keeper := false
-		for _, team := range result.Teams {
-			for _, player := range team.Players {
-				if player.Player.SummonerId == sid {
-					keeper = true
+			keeper := false
+			for _, team := range result.Teams {
+				for _, player := range team.Players {
+					if player.Player.SummonerId == sid {
+						keeper = true
+					}
 				}
 			}
-		}
 
-		if keeper {
-			games = append(games, &result)
-			game_ids = append(game_ids, result.GameId)
+			if keeper {
+				games = append(games, &result)
+				game_ids = append(game_ids, result.GameId)
+			}
 		}
 	}
 
@@ -96,13 +97,28 @@ func handle_summoner(sid uint32, input chan *data.GameRecord, done chan bool) {
 	if summoner.Daily == nil {
 		summoner.Daily = make(map[string]*data.PlayerSnapshot)
 	}
+	
+	sort.Strings(request.Quickdates)
+	quickdate_label := request.Quickdates[0]
+	// Store the snapshot in the right bucket, depending on the label name.
+	if *request.Label == "daily" {
+		summoner.Daily[ quickdate_label ] = &snap
+	} else if *request.Label == "weekly" {
+		summoner.Weekly[ quickdate_label ] = &snap
+	} else if *request.Label == "monthly" {
+		summoner.Monthly[ quickdate_label ] = &snap
+	} else {
+		log.Fatal("Unknown time label:", request.Label)
+	}
 
-	summoner.Daily[*TARGET_DATE] = &snap
 	// Store the revised summoner.
 	retriever.StoreSummoner(&summoner)
-	log.Println(fmt.Sprintf("Saved daily snapshot for summoner #%d on %s", sid, *TARGET_DATE))
 	
-	done <- true
+	log.Println(fmt.Sprintf("Saved %s snapshot for summoner #%d on %s", 
+		*request.Label, 
+		sid, 
+		request.Quickdates[0]))
+	
 	GR_GROUP.Done()
 }
 
@@ -117,34 +133,37 @@ func handle_summoner(sid uint32, input chan *data.GameRecord, done chan bool) {
  */
 func main() {
 	flag.Parse()
-	running_queue := make(chan bool, *MAX_CONCURRENT_GR)
+
+	log.Println("Establishing connection to beanstalk...")
+	bs, cerr := beanstalk.Dial("localhost:11300")
 	
-	// Load up the initial queue.
-	for i := 0; i < *MAX_CONCURRENT_GR; i++ {
-		running_queue <- true
+	if cerr != nil {
+		log.Fatal(cerr)
 	}
-
-	// Basic format test for the target string. Making this a regex would be better.
-	if len(strings.Split(*TARGET_DATE, "-")) != 3 {
-		log.Fatal("Provided date must be in YYYY-MM-DD format")
+	
+	for {
+		// Wait until there's a message available.
+		j, err := bs.Reserve()
+		log.Println("Received request", j.ID)
+		
+		if err != nil {
+			log.Fatal(err)
+		}
+		
+		// Unmarshal the request and kick off a bunch of goroutines, one
+		// per summoner included in the request.
+		request := proto.JoinRequest{}
+		gproto.Unmarshal(j.Body, &request)
+		
+		for _, summoner := range request.Summoners {
+			go handle_summoner(request, summoner)
+			GR_GROUP.Add(1)
+		}
+		
+		// Wait until all summoners are done before moving on to the next request.
+		GR_GROUP.Wait()
+		
+		// The task is done; we can delete it from the queue.
+		bs.Delete(j.ID)
 	}
-
-	/* Read in the list of summoner ID's from a file provided by the user. */
-	retriever := data.LoLRetriever{}
-	cm := lolutil.LoadCandidates(retriever, *SUMMONER_FILE)
-	sid_chan := make([]chan *data.GameRecord, cm.Count())
-	log.Println(fmt.Sprintf("Read %d summoners from champion list.", cm.Count()))
-
-	/* Create a bunch of goroutines, one per summoner, that can be used
-	 * to filter records. */
-	for i := 0; i < (int)(cm.Count()); i++ {
-		<- running_queue
-		sid_chan[i] = make(chan *data.GameRecord)
-
-		GR_GROUP.Add(1)		
-		go handle_summoner(cm.Next(), sid_chan[i], running_queue)
-	}
-
-	// Wait for all goroutines to finish up before exiting.
-	GR_GROUP.Wait()
 }
