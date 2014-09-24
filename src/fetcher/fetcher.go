@@ -67,16 +67,40 @@ func retrieve(summoner uint32, retriever *data.LoLRetriever) {
 
 	if err != nil {
 		log.Println("Error retrieving data:", err)
-		// Log the failed request.
-		// TODO: log different events if the failure is controllable (exceeding freq caps, etc)
-		//   vs serverside (API down, etc).
+		// Failure at this point means we had some low level issue; possible a broken connection.
 		logs.Log(logger.LoLLogEvent{
-			Priority:  syslog.LOG_INFO,
+			Priority:  syslog.LOG_WARNING,
 			Operation: logger.FETCH_MATCH_HISTORY,
-			Outcome:   logger.API_REQUEST_FAILURE,
+			Outcome:   logger.HTTP_CONNECTION_ERROR,
 			Target:    (uint64)(summoner),
 		})
+
+		return
 	} else {
+		// Mark when the rate limit is exceeded.
+		// From https://developer.riotgames.com/api/methods#!/777/2764
+		if resp.StatusCode == 429 {
+			logs.Log(logger.LoLLogEvent{
+				Priority:  syslog.LOG_WARNING,
+				Operation: logger.FETCH_MATCH_HISTORY,
+				Outcome:   logger.API_RATE_LIMIT_EXCEEDED,
+				Target:    (uint64)(summoner),
+			})
+
+			return
+		// This case is for general API failures, all of which should be
+		// rare.
+		} else if resp.StatusCode >= 400 {
+			logs.Log(logger.LoLLogEvent{
+				Priority:  syslog.LOG_WARNING,
+				Operation: logger.FETCH_MATCH_HISTORY,
+				Outcome:   logger.API_REQUEST_FAILURE,
+				Target:    (uint64)(summoner),
+			})
+
+			return
+		}
+
 		defer resp.Body.Close()
 		body, _ := ioutil.ReadAll(resp.Body)
 
