@@ -240,6 +240,27 @@ func (r *LoLRetriever) GetQuickdateGamesIter(quickdate string) GameIter {
 	
 	return iter
 }
+
+func (r *LoLRetriever) GetGameIter() GameIter {
+	r.init()
+
+	iter := GameIter{}
+	iter.Init()
+
+	go func() {
+		query_iter := r.games.collection.Find( bson.M{} ).Iter()
+
+		game := GameRecord{}
+		for query_iter.Next(&game) {
+			iter.queue <- game
+		}
+
+		iter.queue <- GameRecord{ GameId: 0 }
+	} ();
+
+	return iter
+}
+
 /*****************
  *** Game CRUD ***
  *****************/
