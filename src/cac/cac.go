@@ -36,6 +36,8 @@ func getDates(label string, date_string string) []string {
 		num_strings = 7
 	} else if label == "monthly" {
 		num_strings = 30
+	} else {
+		log.Fatal("Unknown label:", label)
 	}
 
 	// Generate all of the quickdates and add them to a single slice.
@@ -46,8 +48,6 @@ func getDates(label string, date_string string) []string {
 		next_date, _ := time.Parse("2006-01-02", date_string)
 		next_date = next_date.Add( 24 * time.Hour )
 		date_string = next_date.Format("2006-01-02")
-
-		dates = append(dates, date_string)
 	}
 
 	log.Println(dates)
