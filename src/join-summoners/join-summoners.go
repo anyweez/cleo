@@ -10,11 +10,11 @@ package main
  */
 
 import (
-	beanstalk "github.com/iwanbk/gobeanstalk"
+	gproto "code.google.com/p/goprotobuf/proto"
 	data "datamodel"
 	"flag"
-	gproto "code.google.com/p/goprotobuf/proto"
 	"fmt"
+	beanstalk "github.com/iwanbk/gobeanstalk"
 	"log"
 	"proto"
 	"snapshot"
@@ -34,12 +34,12 @@ var GR_GROUP sync.WaitGroup
 func handle_summoner(request proto.JoinRequest, sid uint32) {
 	games := make([]*data.GameRecord, 0, 10)
 	game_ids := make([]uint64, 0, 10)
-	
+
 	// Keep reading from the channel until nil comes through, then we're
 	// done receiving info. If the summoner this goroutine is responsible
 	// for played in the game, keep it. Otherwise forget about it.
 	retriever := data.LoLRetriever{}
-	
+
 	for _, qd := range request.Quickdates {
 		games_iter := retriever.GetQuickdateGamesIter(qd)
 
@@ -50,7 +50,7 @@ func handle_summoner(request proto.JoinRequest, sid uint32) {
 			if result.GameId == 0 {
 				continue
 			}
-		
+
 			keeper := false
 			for _, team := range result.Teams {
 				for _, player := range team.Players {
@@ -88,37 +88,37 @@ func handle_summoner(request proto.JoinRequest, sid uint32) {
 
 	// If the summoner doesn't exist, create it.
 	if !exists {
-		log.Println(fmt.Sprintf("Notice: Couldn't find summoner #%d; creating new instance.", sid)		)
+		log.Println(fmt.Sprintf("Notice: Couldn't find summoner #%d; creating new instance.", sid))
 		summoner = data.SummonerRecord{}
 		summoner.SummonerId = sid
 	}
-	
+
 	// Append the snapshot.
 	if summoner.Daily == nil {
 		summoner.Daily = make(map[string]*data.PlayerSnapshot)
 	}
-	
+
 	sort.Strings(request.Quickdates)
 	quickdate_label := request.Quickdates[0]
 	// Store the snapshot in the right bucket, depending on the label name.
 	if *request.Label == "daily" {
-		summoner.Daily[ quickdate_label ] = &snap
+		summoner.Daily[quickdate_label] = &snap
 	} else if *request.Label == "weekly" {
-		summoner.Weekly[ quickdate_label ] = &snap
+		summoner.Weekly[quickdate_label] = &snap
 	} else if *request.Label == "monthly" {
-		summoner.Monthly[ quickdate_label ] = &snap
+		summoner.Monthly[quickdate_label] = &snap
 	} else {
 		log.Fatal("Unknown time label:", request.Label)
 	}
 
 	// Store the revised summoner.
 	retriever.StoreSummoner(&summoner)
-	
-	log.Println(fmt.Sprintf("Saved %s snapshot for summoner #%d on %s", 
-		*request.Label, 
-		sid, 
+
+	log.Println(fmt.Sprintf("Saved %s snapshot for summoner #%d on %s",
+		*request.Label,
+		sid,
 		request.Quickdates[0]))
-	
+
 	GR_GROUP.Done()
 }
 
@@ -136,33 +136,33 @@ func main() {
 
 	log.Println("Establishing connection to beanstalk...")
 	bs, cerr := beanstalk.Dial("localhost:11300")
-	
+
 	if cerr != nil {
 		log.Fatal(cerr)
 	}
-	
+
 	for {
 		// Wait until there's a message available.
 		j, err := bs.Reserve()
 		log.Println("Received request", j.ID)
-		
+
 		if err != nil {
 			log.Fatal(err)
 		}
-		
+
 		// Unmarshal the request and kick off a bunch of goroutines, one
 		// per summoner included in the request.
 		request := proto.JoinRequest{}
 		gproto.Unmarshal(j.Body, &request)
-		
+
 		for _, summoner := range request.Summoners {
 			go handle_summoner(request, summoner)
 			GR_GROUP.Add(1)
 		}
-		
+
 		// Wait until all summoners are done before moving on to the next request.
 		GR_GROUP.Wait()
-		
+
 		// The task is done; we can delete it from the queue.
 		bs.Delete(j.ID)
 	}

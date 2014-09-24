@@ -70,12 +70,12 @@ func retrieve(summoner uint32, retriever *data.LoLRetriever) {
 		// Log the failed request.
 		// TODO: log different events if the failure is controllable (exceeding freq caps, etc)
 		//   vs serverside (API down, etc).
-		logs.Log( logger.LoLLogEvent{ 
-			Priority: syslog.LOG_INFO, 
+		logs.Log(logger.LoLLogEvent{
+			Priority:  syslog.LOG_INFO,
 			Operation: logger.FETCH_MATCH_HISTORY,
-			Outcome: logger.API_REQUEST_FAILURE,
-			Target: (uint64)(summoner),
-		} )
+			Outcome:   logger.API_REQUEST_FAILURE,
+			Target:    (uint64)(summoner),
+		})
 	} else {
 		defer resp.Body.Close()
 		body, _ := ioutil.ReadAll(resp.Body)
@@ -98,7 +98,7 @@ func retrieve(summoner uint32, retriever *data.LoLRetriever) {
 					// Otherwise merge with a pre-existing record.
 					// TODO: add a lock to make sure the response we retrieve doesn't go stale before we
 					//   update it.
-					
+
 					// A ridiculously nested loop that compares players in the stored game record with
 					// players from the new record and merges them if it finds overlap (should be exactly
 					// one player). The found_player variable is used to confirm that only one player
@@ -132,17 +132,17 @@ func retrieve(summoner uint32, retriever *data.LoLRetriever) {
 				} // end else
 			} // end STORE_RESPONSES block
 		} // end for
-		logs.Log( logger.LoLLogEvent{ 
-			Priority: syslog.LOG_INFO, 
+		logs.Log(logger.LoLLogEvent{
+			Priority:  syslog.LOG_INFO,
 			Operation: logger.FETCH_MATCH_HISTORY,
-			Outcome: logger.SUCCESS,
-			Target: (uint64)(summoner),
-		} )
+			Outcome:   logger.SUCCESS,
+			Target:    (uint64)(summoner),
+		})
 	}
 }
 
 func timestampToQuickdate(ts uint64) uint32 {
-	num, _ := strconv.Atoi( time.Unix( (int64)(ts / 1000), 0).Format("20060102") )
+	num, _ := strconv.Atoi(time.Unix((int64)(ts/1000), 0).Format("20060102"))
 
 	return (uint32)(num)
 }

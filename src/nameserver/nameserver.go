@@ -1,9 +1,9 @@
 package main
 
 import (
+	gproto "code.google.com/p/goprotobuf/proto"
 	data "datamodel"
 	"fmt"
-	gproto "code.google.com/p/goprotobuf/proto"
 	"log"
 	"proto"
 	"query"
@@ -23,14 +23,14 @@ func load_summoners() map[string]uint32 {
 
 	for summoners_iter.HasNext() {
 		summoner := summoners_iter.Next()
-		
+
 		// If we've got a valid summoner and their name is set, store it
 		// in the lookup table.
 		if summoner.SummonerId > 0 && len(summoner.Metadata.SummonerName) > 0 {
 			summoners[strings.ToLower(summoner.Metadata.SummonerName)] = summoner.SummonerId
 		}
 	}
-	
+
 	summoners["brigado"] = 36142441
 	return summoners
 }
@@ -50,7 +50,7 @@ func handle_request(request *query.QueryRequest, summoners map[string]uint32, qm
 
 	if ok {
 		response.Id = gproto.Uint32(sid)
-	// Didn't find the name
+		// Didn't find the name
 	} else {
 		response.Id = gproto.Uint32(0)
 	}
@@ -60,7 +60,7 @@ func handle_request(request *query.QueryRequest, summoners map[string]uint32, qm
 func main() {
 	// Load all summoner data
 	summoner_map := load_summoners()
-	log.Println( fmt.Sprintf("Loaded %d summoners from backend.", len(summoner_map)) )
+	log.Println(fmt.Sprintf("Loaded %d summoners from backend.", len(summoner_map)))
 
 	log.Println("Opening port...")
 	manager := query.QueryManager{}

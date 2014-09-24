@@ -2,12 +2,12 @@ package main
 
 import (
 	data "datamodel"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
-	"io/ioutil"
-	"encoding/json"
 	"time"
 )
 
@@ -25,15 +25,15 @@ func update(who *data.SummonerRecord, retriever *data.LoLRetriever) {
 	url := "https://na.api.pvp.net/api/lol/na/v1.4/summoner/%d/name?api_key=%s"
 
 	resp, err := http.Get(fmt.Sprintf(url, who.SummonerId, *API_KEY))
-    response := make(map[string]string)
+	response := make(map[string]string)
 
-    if err != nil {
+	if err != nil {
 		log.Println("Error retrieving data:", err)
-    } else {
+	} else {
 		defer resp.Body.Close()
-        body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := ioutil.ReadAll(resp.Body)
 
-        json.Unmarshal(body, &response)
+		json.Unmarshal(body, &response)
 
 		empty := data.SummonerMetadata{}
 		for _, v := range response {
@@ -58,15 +58,15 @@ func main() {
 
 	for {
 		summoners_iter := retriever.GetAllSummonersIter()
-		
+
 		for summoners_iter.HasNext() {
 			summoner := summoners_iter.Next()
-	
+
 			for summoner.SummonerId != 0 {
 				// If the summoner name is not set, let's look it up.
-                if len(summoner.SummonerName) == 0 {
+				if len(summoner.SummonerName) == 0 {
 					go update(&summoner, &retriever)
-                    time.Sleep(1100 * time.Millisecond)
+					time.Sleep(1100 * time.Millisecond)
 				}
 
 				summoner = summoners_iter.Next()

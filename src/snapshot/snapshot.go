@@ -3,6 +3,7 @@ package snapshot
 import (
 	data "datamodel"
 )
+
 // TODO: Handle return values of NaN correctly.
 
 type SnapshotFunction func(snapshot data.PlayerSnapshot, games []*data.GameRecord) (string, data.Metric)
@@ -37,7 +38,7 @@ func kda(snapshot data.PlayerSnapshot, games []*data.GameRecord) (string, data.M
 	}
 
 	if num_deaths > 0 {
-		return "kda", data.SimpleNumberMetric{ (float64)(num_kills + num_assists) / (float64)(num_deaths) }
+		return "kda", data.SimpleNumberMetric{(float64)(num_kills+num_assists) / (float64)(num_deaths)}
 	} else {
 		return "kda", data.SimpleNumberMetric{}
 	}
@@ -61,7 +62,7 @@ func minionKills(snapshot data.PlayerSnapshot, games []*data.GameRecord) (string
 		}
 	}
 	if num_set_games > 0 && len(games) > 0 {
-		return "minionKills", data.SimpleNumberMetric{(float64)(num_minions) / (float64)(len(games)) }
+		return "minionKills", data.SimpleNumberMetric{(float64)(num_minions) / (float64)(len(games))}
 	} else {
 		return "minionKills", data.SimpleNumberMetric{}
 	}

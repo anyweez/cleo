@@ -6,17 +6,18 @@ import (
 	"fmt"
 	"log"
 	"net"
-//	"proto"
+	//	"proto"
 	"switchboard"
 	"time"
 )
 
 type QueryRequest struct {
-	Query	interface{}
-	Conn	*net.Conn
+	Query interface{}
+	Conn  *net.Conn
 
-	TimeReceived	int64
+	TimeReceived int64
 }
+
 /*
 type GameQueryRequest struct {
 	Id    string
@@ -39,6 +40,7 @@ type QueryManager struct {
 	//	Listener *net.TCPListener
 	Switchboard switchboard.SwitchboardServer
 }
+
 /*
 func GetQueryId(qry proto.GameQuery) string {
 	return fmt.Sprintf("Q%d.%d", qry.QueryProcess, qry.QueryId)
@@ -54,7 +56,7 @@ func (q *QueryManager) Connect(port int) {
 		log.Fatal("Couldn't open port for listening.")
 	}
 
-	log.Println(fmt.Sprintf("Query server listening on port %d",  port))
+	log.Println(fmt.Sprintf("Query server listening on port %d", port))
 }
 
 func (q *QueryManager) Listen(query_type gproto.Message) QueryRequest {
@@ -78,13 +80,13 @@ func (q *QueryManager) Listen(query_type gproto.Message) QueryRequest {
 }
 
 func (q *QueryManager) Reply(request *QueryRequest, response gproto.Message) {
-        defer (*request.Conn).Close()
+	defer (*request.Conn).Close()
 
-        data, _ := gproto.Marshal(response)
+	data, _ := gproto.Marshal(response)
 
-        // Send the data back to the responder and decrement the # of active queries.
-        rw := bufio.NewReadWriter(bufio.NewReader(*request.Conn), bufio.NewWriter(*request.Conn))
-        rw.WriteString(string(data) + "|")
-        rw.Flush()
-        log.Println("response sent")
+	// Send the data back to the responder and decrement the # of active queries.
+	rw := bufio.NewReadWriter(bufio.NewReader(*request.Conn), bufio.NewWriter(*request.Conn))
+	rw.WriteString(string(data) + "|")
+	rw.Flush()
+	log.Println("response sent")
 }

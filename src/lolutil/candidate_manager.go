@@ -41,9 +41,9 @@ func (cm *CandidateManager) Pop() uint32 {
 	if cm.Count() == 0 {
 		return 0
 	}
-	
+
 	cm.count -= 1
-	return <- cm.Queue
+	return <-cm.Queue
 }
 
 func (cm *CandidateManager) Count() uint32 {
@@ -52,11 +52,11 @@ func (cm *CandidateManager) Count() uint32 {
 
 func LoadCandidates(retriever data.LoLRetriever, seedfile string) CandidateManager {
 	cm := CandidateManager{}
-	
+
 	// Load in a file full of summoner ID's as a seed set and add it to the list
 	// of already-known summoners.
 	var summoner_ids []uint32
-	 
+
 	if len(seedfile) > 0 {
 		summoner_ids = read_summoner_ids(seedfile)
 	}
@@ -77,16 +77,16 @@ func LoadCandidates(retriever data.LoLRetriever, seedfile string) CandidateManag
 
 	for summoner_iter.HasNext() {
 		summ = summoner_iter.Next()
-		
+
 		if summ.SummonerId != 0 {
-			cm.Add( summ.SummonerId )
+			cm.Add(summ.SummonerId)
 		}
 	}
 
 	return cm
 }
 
-/** 
+/**
  * This function reads in a list of champions from a local file to start
  * as the seeding set. The fetcher will automatically include new champions
  * it discovers on its journey as well.
