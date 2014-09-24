@@ -67,6 +67,15 @@ func retrieve(summoner uint32, retriever *data.LoLRetriever) {
 
 	if err != nil {
 		log.Println("Error retrieving data:", err)
+		// Log the failed request.
+		// TODO: log different events if the failure is controllable (exceeding freq caps, etc)
+		//   vs serverside (API down, etc).
+		logs.Log( logger.LoLLogEvent{ 
+			Priority: syslog.LOG_INFO, 
+			Operation: logger.FETCH_MATCH_HISTORY,
+			Outcome: logger.API_REQUEST_FAILURE,
+			Target: (uint64)(summoner),
+		} )
 	} else {
 		defer resp.Body.Close()
 		body, _ := ioutil.ReadAll(resp.Body)

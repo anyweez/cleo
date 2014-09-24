@@ -44,6 +44,7 @@ const (
 const (
 	SUCCESS				LoLOutcome		=	iota
 	API_REQUEST_FAILURE	LoLOutcome		=	iota
+	API_RATE_LIMIT_EXCEEDED	LoLOutcome		=	iota
 )
 
 
