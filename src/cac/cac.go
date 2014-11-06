@@ -1,5 +1,11 @@
 package main
 
+/**
+ * The "command and control" binary that loads all of the distributed tasks into
+ * thei beanstalk queue. The tasks that are generated are based on the flags that
+ * are sent. 
+ */
+
 import (
 	gproto "code.google.com/p/goprotobuf/proto"
 	data "datamodel"
@@ -19,27 +25,51 @@ import (
  */
 
 var (
-	SUMMONER_FILE = flag.String("summoners", "", "The file containing the list of summoners to handle.")
-	MAX_PER_NODE  = flag.Int("max_node", 100, "The maximum number of summoners that should be directed to a single worker")
-	LABEL         = flag.String("label", "daily", "")
-	START_DATE    = flag.String("start_date", "", "")
+	SUMMONER_FILE 	= flag.String("summoners", "", "The file containing the list of summoners to handle.")
+	MAX_PER_NODE  	= flag.Int("max_node", 100, "The maximum number of summoners that should be directed to a single worker")
+	LABEL			= flag.String("label", "daily", "")
+	START_DATE		= flag.String("target_date", "", "The specific date to be analyzed or a date from within the range to be analyzed.")
 )
 
+func daysIn(m time.Month, year int) int { 
+    // This is equivalent to time.daysIn(m, year). 
+    return time.Date(year, m+1, 0, 0, 0, 0, 0, time.UTC).Day() 
+} 
+ 
 func getDates(label string, date_string string) []string {
+	date, _ := time.Parse("2006-01-02", date_string)
 	var dates []string
-	num_strings := 1
 
 	// Set the number of strings that we want for a given label
 	if label == "daily" {
-		num_strings = 1
+		// Add a single time string
+		dates = append(dates, date_string)
 	} else if label == "weekly" {
-		num_strings = 7
+		// Find the start date of the week first.
+		week_start := date
+		for week_start.Weekday() != time.Sunday {
+			week_start = week_start.AddDate(0, 0, -1)
+		}
+
+		// Then count seven dates.
+		for i := 0; i < 7; i++ {
+			dates = append(dates, week_start.Format("2006-01-02")) 
+			week_start = week_start.AddDate(0, 0, 1)
+		}
 	} else if label == "monthly" {
-		num_strings = 30
+                // Find the start date of the month first.
+                month_start := time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, nil)
+
+                // Then count seven dates.
+                for i := 0; i < daysIn(month_start.Month(), month_start.Year()); i++ {
+                        dates = append(dates, month_start.Format("2006-01-02")) 
+			month_start = month_start.AddDate(0, 0, 1)
+                }
 	} else {
 		log.Fatal("Unknown label:", label)
 	}
 
+<<<<<<< HEAD
 	// Generate all of the quickdates and add them to a single slice.
 	for i := 0; i < num_strings; i++ {
 		dates = append(dates, date_string)
@@ -50,6 +80,8 @@ func getDates(label string, date_string string) []string {
 		date_string = next_date.Format("2006-01-02")
 	}
 
+=======
+>>>>>>> d9ad7df3f76fb88840bdfe08fca3b05cbec52b1d
 	log.Println(dates)
 	return dates
 }
