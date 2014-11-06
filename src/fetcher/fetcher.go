@@ -11,6 +11,7 @@ import (
 	"logger"
 	"lolutil"
 	"net/http"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ var logs = logger.LoLLogger{}
 const STORE_RESPONSES = true
 
 func main() {
+	system_grt_count := runtime.NumGoroutine()
 	// Flag setup
 	flag.Parse()
 
@@ -45,6 +47,7 @@ func main() {
 		// Wait for 1.20 seconds to account for the rate limiting that
 		// Riot requires.
 		time.Sleep(1100 * time.Millisecond)
+		log.Println(fmt.Sprintf("Active requests: %d\n", runtime.NumGoroutine() - system_grt_count))
 
 		// Push the player to the retrieval queue.
 		go retrieve(cm.Next(), &retriever)
@@ -128,6 +131,7 @@ func retrieve(summoner uint32, retriever *data.LoLRetriever) {
 					// one player). The found_player variable is used to confirm that only one player
 					// is updated.
 					found_target := 0
+					target_already_set := 0
 					for i, recorded_team := range record.Teams {
 						for j, recorded_player := range recorded_team.Players {
 							for k, incoming_team := range game.Teams {
@@ -143,6 +147,8 @@ func retrieve(summoner uint32, retriever *data.LoLRetriever) {
 											// been merged into this game record.
 											record.MergeCount += 1
 											retriever.StoreGame(&game)
+										} else if recorded_player.IsSet {
+											target_already_set += 1
 										}
 									}
 								}
@@ -150,7 +156,7 @@ func retrieve(summoner uint32, retriever *data.LoLRetriever) {
 						}
 					}
 
-					if found_target == 0 {
+					if found_target == 0 && target_already_set == 0 {
 						log.Println("Found matching game ID's with non-matching summoner ID's.")
 					}
 				} // end else

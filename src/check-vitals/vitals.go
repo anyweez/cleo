@@ -7,6 +7,7 @@ import (
 	loggly "github.com/go-loggly-search"
 	"log"
 	"logger"
+	stats "github.com/GaryBoone/GoStats/stats"
 	"time"
 )
 
@@ -23,8 +24,8 @@ type MetaLogEvent struct {
 
 type FillStats struct {
 	Histogram  []float32
-	AvgFill    float32
-	StddevFill float32
+	AvgFill    float64
+	StddevFill float64
 }
 
 func (self *FillStats) pretty() string {
@@ -33,8 +34,10 @@ func (self *FillStats) pretty() string {
 	out += "\nGames where MergeCount = x\n--------------------------\n"
 
 	for i, val := range self.Histogram {
-		out += fmt.Sprintf("%d: %f\n", i+1, val)
+		out += fmt.Sprintf("%d: %.3f\n", i, val)
 	}
+
+	out += fmt.Sprintf("Avg fill: %.2f (stddev: %.2f)", self.AvgFill, self.StddevFill)
 
 	return out
 }
@@ -47,10 +50,10 @@ func (self *FreshnessStats) pretty() string {
 }
 
 type FreshnessStats struct {
-	MeanLookupsPerId   float32
-	StddevLookupsPerId float32
-	MeanGap            float32
-	StddevGap          float32
+	MeanLookupsPerId   float64
+	StddevLookupsPerId float64
+	MeanGap            float64
+	StddevGap          float64
 }
 
 func getEvents() []*MetaLogEvent {
@@ -88,11 +91,11 @@ func getGameIter() data.GameIter {
  */
 func getFillStats() FillStats {
 	iter := getGameIter()
-	stats := FillStats{}
+	data := FillStats{}
 
-	stats.Histogram = make([]float32, 10)
+	data.Histogram = make([]float32, 11)
 	count := 0
-	fullset := make([]uint32, 0, 100)
+	fullset := make([]float64, 0, 100)
 
 	for iter.HasNext() {
 		game := iter.Next()
@@ -102,19 +105,19 @@ func getFillStats() FillStats {
 			continue
 		}
 
-		stats.Histogram[game.MergeCount] += 1
-		fullset = append(fullset, game.MergeCount)
+		data.Histogram[game.MergeCount] += 1
+		fullset = append(fullset, (float64)(game.MergeCount))
 		count += 1
 	}
 
-	for i := 0; i < len(stats.Histogram); i++ {
-		stats.Histogram[i] = (float32)(stats.Histogram[i]) / (float32)(count)
+	for i := 0; i < len(data.Histogram); i++ {
+		data.Histogram[i] = (float32)(data.Histogram[i]) / (float32)(count)
 	}
 
-	//	stats.AvgFill = average(fullset)
-	//	stats.StddevFill = stddev(fullset)
+	data.AvgFill = stats.StatsMean(fullset)
+	data.StddevFill = stats.StatsSampleStandardDeviation(fullset)
 
-	return stats
+	return data
 }
 
 /**
@@ -169,10 +172,9 @@ func main() {
 	log.Println("Fetching data and calculating...")
 
 	// Use logs to find out how often we get to examine each summoner (depth)
-	fresh := FreshnessStats{}
-	fmt.Println(fresh.pretty())
-	//	freq := getFreshnessStats()
+	fresh := getFreshnessStats()
 	//	fmt.Println("Frequency stats:", freq)
+	fmt.Println(fresh.pretty())
 
 	// Use the games database to determine how many summoners we typically see in a game (breadth).
 	fill := getFillStats()
