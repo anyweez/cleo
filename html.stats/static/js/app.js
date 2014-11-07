@@ -1,63 +1,31 @@
 
 /**
- *  Set up the Chart.js defaults.
+ * This function accepts a daily, weekly, or monthly record set and
+ * converts it into an array that can be used for generating a timeline.
+ * 
+ * Example value for 'record' is Records.Daily.
+ * Output should look like: [{x: <unix_ts>, y: <value>}, {...}]
  */
-/*
-Chart.defaults.global = {
-	animationEasing: "easeOutQuart",
-	responsive: true,
-	showTooltips: true,
-	tooltipFillColor: "rgba(0,0,0,0.8)",
-	tooltipFontFamily: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif",
-	tooltipFontSize: 14,
-	tooltipFontStyle: "normal",
-	tooltipFontColor: "#fff",
-	tooltipTitleFontFamily: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif",
-	tooltipTitleFontSize: 14,
-	tooltipTitleFontStyle: "bold",
-	tooltipTitleFontColor: "#fff",
-	tooltipTemplate: "Games Played<%if (label){%><%=label%>: <%}%><%= value %>",
-};
-*/
+function timeline(metric, records) {
+	output = [];
+	
+	for (date in records) {
+		x = Math.round( new Date(date).getTime() / 1000 ); 
+		y = records[date].Stats[metric].Value;
+		
+		output.push( {x: x, y: y} );
+	}
+	
+	return output;
+}
 
 (function() {
-    var app = angular.module("LoLStats", ["angles"]);
-    
-    app.factory("graphData", function($rootScope) {
-		var graphData = {};
-		
-		graphData.labels = [];
-		graphData.data = {};
-		graphData.activeMetric = "";
-		
-		graphData.setLabels = function(labels) {
-			graphData.labels = labels;
-		}
-		
-		graphData.getLabels = function() {
-			return graphData.labels;
-		}
-		
-		graphData.setData = function(metric, data) {
-			graphData.data[metric] = data;
-		}
-		
-		graphData.getData = function() {
-			return graphData.data[graphData.activeMetric];
-		}
-		
-		graphData.setActiveMetric = function(metric) {
-			graphData.activeMetric = metric;
-			$rootScope.$broadcast('updateGraph');
-		}
-		
-		return graphData;
-	});
+    var app = angular.module("LoLStats", []);
     
     /**
 	 * The application-level controller for the full app.
 	 */
-	app.controller("AppController", function($scope, $http, graphData) {
+	app.controller("AppController", function($scope, $http) {
 		// Identify whether the requestedSummoner is a known entity.
 		$scope.validSummoner = false;
 		$scope.metrics = [];
@@ -90,9 +58,10 @@ Chart.defaults.global = {
 		// This should make a request to get the JSON response for the provided
 		// summoner.
 		$scope.requestSummoner = function() {			
-			$http.get("static/sample.json").success(function(data) {		
+			$http.get("/summoner/?name=brigado").success(function(data) {		
 			//$http.get("summoners/" + $scope.requestedSummoner).success(function(data) {
 				$scope.validSummoner = data.KnownSummoner;
+				$scope.summonerData = data.Records;
 				
 				dates = [];
 				// Use a hash table as a set to get the full list of metrics.
@@ -108,70 +77,55 @@ Chart.defaults.global = {
 						metrics[metric.Name] = true;
 					}
 				}
-				
-				// Build timeseries data structures
-				$scope.timeseries = {}
-				for (var metric in metrics) {
-					$scope.timeseries[metric] = {}
-					
-					for (var i = 0; i < dates.length; i++) {
-						for (var j = 0; j < data.Records.Daily[dates[i]].Stats.length; j++) {
-							m = data.Records.Daily[dates[i]].Stats[j];
-														
-							if (m.Name == metric) {
-								$scope.timeseries[metric][dates[i]] = m.Absolute;								
-							}
-						}
-					}
-				}
-				
-				$scope.metrics = [];
-				for (var metric in metrics) {
-					$scope.metrics.push(metric);
-				}
-				
-				$scope.dates = dates;
-				graphData.setLabels(dates);
-				
-				for (var i = 0; i < $scope.metrics.length; i++) {
-					var graph_data = [];
-					
-					for (var j = 0; j < dates.length; j++) {
-						graph_data.push( $scope.timeseries[$scope.metrics[i]][dates[j]] );
-					}
-					graphData.setData($scope.metrics[i], graph_data);
-				}
-				
-				graphData.setActiveMetric($scope.metrics[0]);
+
+				console.log("Broadcasting update request");
+				$scope.$broadcast("summonerUpdate", null);				
 			});
 		}
+		
+		$scope.requestSummoner();
 	});
 	
-	
-	
 	/**
-	 * Initial configuration and updates to the chart on the page.
+	 * 
 	 */
-	app.controller("ChartController", function($scope, $http, $rootScope, graphData) {
-		$scope.chart = {
-			labels : graphData.labels,
-			datasets : [{
-				fillColor : "rgba(151,187,205,0)",
-				strokeColor : "#e67e22",
-				pointColor : "rgba(151,187,205,0)",
-				pointStrokeColor : "#e67e22",
-				data : [0, 0, 0]
-			}],
-		};
+	app.controller("ReportingController", function($scope, $rootScope) {
+		console.log("Controller is live");
+		$scope.metric = metric_data.kda;
 		
-		$scope.chart_options = {
-			scaleStartValue: 0
-		};
-		
-		$scope.$on("updateGraph", function() {
-			console.log("Updating graph...")
-			$scope.chart.labels = graphData.getLabels();
-			$scope.chart.datasets[0].data = graphData.getData();
+		// Once we get the summoner's data we hsould update the reporting element.
+		$scope.$on("summonerUpdate", function() {
+			console.log("Updating");
+			// Convert the user's performance data into a time series if this is a
+			// chart-based metric.
+			tlData = timeline("kda", $scope.summonerData.Daily);
+			$scope.metric.value = tlData[tlData.length - 1].y;
+			$scope.metric.context = "above average for your rank";
+
+			// Draw the graph
+			var graph = new Rickshaw.Graph( {
+				element: document.querySelector("#kda-chart"),
+				width: 1450,
+				height: 200,
+				series: [ {
+					color: "steelblue",
+					data: tlData,
+					name: $scope.metric.name
+				} ]
+			});
+			
+			var xaxis = new Rickshaw.Graph.Axis.Time( {graph: graph} );
+			var yaxis = new Rickshaw.Graph.Axis.Y( {
+				graph: graph,
+				orientation: "left",
+				tickFormat: Rickshaw.Fixtures.Number.formatKMBT,
+				element: document.getElementById("kda-yaxis"),
+			});
+			var hoverDetail = new Rickshaw.Graph.HoverDetail( {
+				graph: graph
+			} );
+
+			graph.render();
 		});
 	});
 })();

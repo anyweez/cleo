@@ -1,0 +1,69 @@
+
+.detailed-view {
+	border-bottom: 1px solid black;
+	padding: 25px 5px 25px 5px;
+}
+
+.metric-overview {
+	display: inline-block;
+	vertical-align: top;
+	
+	padding-right: 100px;
+}
+
+.metric-overview p {
+	margin: 0px;
+	padding: 0px;
+}
+
+.metric-overview .metric-name {
+	font-weight: bold;
+	font-size: 1.2em;
+	
+	color: black;
+}
+
+.metric-overview .metric-subtext {
+	font-weight: normal;
+	font-size: 1em;
+	
+	color: #333;
+}
+
+.metric-overview .metric-value {
+	font-size: 4em;
+	font-weight: bold;
+	
+	color: green;
+}
+
+.metric-overview .metric-context {
+	font-size: .9em;
+	font-weight: normal;
+	font-style: italics;
+	
+	color: #333;
+}
+
+.detailed-view .chart {
+
+}
+
+.visualization {
+	position: relative;
+	left: -35px;
+	
+	display: inline-block;
+}
+
+.visualization .axis {
+	position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 40px;
+}
+
+.visualization .chart {
+	position: relative;
+    left: 40px;
+}

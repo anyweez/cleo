@@ -5,6 +5,7 @@ import (
 	gproto "code.google.com/p/goprotobuf/proto"
 	data "datamodel"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -76,11 +77,45 @@ func summoner_handler(w http.ResponseWriter, r *http.Request) {
 	retriever := data.LoLRetriever{}
 
 	if valid {
-		stat_request.Records, _ = retriever.GetSummoner(summoner_id)
 		// Make a request to the backend to get the snapshot data for
 		// this summoner.
-//		stat_request.Records = retriever.GetSnapshots(summoner_id)
-		log.Println(stat_request.Records)
+		stat_request.Records, _ = retriever.GetSummoner(summoner_id)
+	}
+
+	// TODO: Remove this once everything works well.
+	if name == "brigado" {
+		stat_request.Records.Daily = make(map[string]*data.PlayerSnapshot)
+		stat_request.Records.Daily["2014-09-17"] = &data.PlayerSnapshot {
+			SummonerId: stat_request.Player.SummonerId,
+			GamesList: []uint64{5, 10, 11, 19},
+			Stats: make(map[string]data.Metric),
+			CreationTimestamp: 0,
+		}
+		
+		stat_request.Records.Daily["2014-09-17"].Stats["kda"] = data.SimpleNumberMetric { Value: 11 }
+		stat_request.Records.Daily["2014-09-17"].Stats["minionKills"] = data.SimpleNumberMetric { Value: 20 }
+
+		// Add data for 9/18
+		stat_request.Records.Daily["2014-09-18"] = &data.PlayerSnapshot {
+			SummonerId: stat_request.Player.SummonerId,
+			GamesList: []uint64{5, 10, 11, 19},
+			Stats: make(map[string]data.Metric),
+			CreationTimestamp: 0,
+		}
+		
+		stat_request.Records.Daily["2014-09-18"].Stats["kda"] = data.SimpleNumberMetric { Value: 13 }
+		stat_request.Records.Daily["2014-09-18"].Stats["minionKills"] = data.SimpleNumberMetric { Value: 24 }
+
+	// Add data for 9/19
+		stat_request.Records.Daily["2014-09-19"] = &data.PlayerSnapshot {
+			SummonerId: stat_request.Player.SummonerId,
+			GamesList: []uint64{5, 10, 11, 19},
+			Stats: make(map[string]data.Metric),
+			CreationTimestamp: 0,
+		}
+		
+		stat_request.Records.Daily["2014-09-19"].Stats["kda"] = data.SimpleNumberMetric { Value: 14.1 }
+		stat_request.Records.Daily["2014-09-19"].Stats["minionKills"] = data.SimpleNumberMetric { Value: 37 }
 	}
 
 	log.Println(stat_request)
@@ -90,7 +125,9 @@ func summoner_handler(w http.ResponseWriter, r *http.Request) {
 		log.Fatal("fatal error:", jerr)
 	}
 
-	w.Write([]byte(response_string))
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, string(response_string))
+	
 	log.Println("Response sent")
 }
 
