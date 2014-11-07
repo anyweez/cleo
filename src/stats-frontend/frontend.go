@@ -3,20 +3,19 @@ package main
 import (
 	"bufio"
 	gproto "code.google.com/p/goprotobuf/proto"
+	data "datamodel"
 	"encoding/json"
-	"gamelog"
 	"log"
 	"net"
 	"net/http"
 	"proto"
-	"snapshot"
 	"switchboard"
 )
 
 type FrontendStatsRequest struct {
 	KnownSummoner bool
-	Player        gamelog.PlayerType
-	Records       snapshot.SummonerRecord
+	Player        data.PlayerType
+	Records       data.SummonerRecord
 }
 
 // Switchboard to be used by all of the goroutines.
@@ -74,13 +73,13 @@ func summoner_handler(w http.ResponseWriter, r *http.Request) {
 	stat_request.Player.Name = name
 	stat_request.Player.SummonerId = summoner_id
 
-	retriever := snapshot.Retriever{}
-	retriever.Init()
+	retriever := data.LoLRetriever{}
 
 	if valid {
+		stat_request.Records, _ = retriever.GetSummoner(summoner_id)
 		// Make a request to the backend to get the snapshot data for
 		// this summoner.
-		stat_request.Records = retriever.GetSnapshots(summoner_id)
+//		stat_request.Records = retriever.GetSnapshots(summoner_id)
 		log.Println(stat_request.Records)
 	}
 

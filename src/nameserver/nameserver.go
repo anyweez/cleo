@@ -50,9 +50,11 @@ func handle_request(request *query.QueryRequest, summoners map[string]uint32, qm
 
 	if ok {
 		response.Id = gproto.Uint32(sid)
+		log.Println( fmt.Sprintf("Found mapping [%s = %d]", *name_request.Name, sid) )
 		// Didn't find the name
 	} else {
 		response.Id = gproto.Uint32(0)
+		log.Println( fmt.Sprintf("Mapping not found [%s = ?]", *name_request.Name) )
 	}
 	qm.Reply(request, &response)
 }
