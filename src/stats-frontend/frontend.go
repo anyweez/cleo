@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"proto"
 	"switchboard"
+	"text/template"
 )
 
 type FrontendStatsRequest struct {
@@ -133,7 +134,6 @@ func summoner_handler(w http.ResponseWriter, r *http.Request) {
 
 func index_handler(w http.ResponseWriter, r *http.Request) {
 	log.Println("index requested")
-
 	http.ServeFile(w, r, "html.stats/index.html")
 }
 

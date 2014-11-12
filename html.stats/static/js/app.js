@@ -10,6 +10,7 @@ function timeline(metric, records) {
 	output = [];
 	
 	for (date in records) {
+		console.log(records[date]);
 		x = Math.round( new Date(date).getTime() / 1000 ); 
 		y = records[date].Stats[metric].Value;
 		
@@ -31,6 +32,7 @@ function timeline(metric, records) {
 		$scope.metrics = [];
 		$scope.dates = [];
 		
+		/*
 		$scope.summary_value = function(metric) {
 			if (metric == null) {
 				return "XX (+X%)"
@@ -54,6 +56,7 @@ function timeline(metric, records) {
 				return metric[latest] + " (" + Math.round(delta * 1000) / 10 + "%)";	
 			}
 		}
+		*/
 		
 		// This should make a request to get the JSON response for the provided
 		// summoner.
@@ -89,22 +92,22 @@ function timeline(metric, records) {
 	/**
 	 * 
 	 */
-	app.controller("ReportingController", function($scope, $rootScope) {
-		console.log("Controller is live");
-		$scope.metric = metric_data.kda;
+	app.controller("ReportingController", function($scope, $attrs) {
+		console.log("Controller for " + $attrs.metric + " is live");
+		$scope.metric = metric_data[$attrs.metric];
 		
 		// Once we get the summoner's data we hsould update the reporting element.
 		$scope.$on("summonerUpdate", function() {
-			console.log("Updating");
+			console.log("Updating " + $attrs.metric);
 			// Convert the user's performance data into a time series if this is a
 			// chart-based metric.
-			tlData = timeline("kda", $scope.summonerData.Daily);
+			tlData = timeline($attrs.metric, $scope.summonerData.Daily);
 			$scope.metric.value = tlData[tlData.length - 1].y;
 			$scope.metric.context = "above average for your rank";
 
 			// Draw the graph
 			var graph = new Rickshaw.Graph( {
-				element: document.querySelector("#kda-chart"),
+				element: document.querySelector("#" + $attrs.metric + "-chart"),
 				width: 1450,
 				height: 200,
 				series: [ {
@@ -119,7 +122,7 @@ function timeline(metric, records) {
 				graph: graph,
 				orientation: "left",
 				tickFormat: Rickshaw.Fixtures.Number.formatKMBT,
-				element: document.getElementById("kda-yaxis"),
+				element: document.getElementById($attrs.metric + "-yaxis"),
 			});
 			var hoverDetail = new Rickshaw.Graph.HoverDetail( {
 				graph: graph

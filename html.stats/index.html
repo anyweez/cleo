@@ -29,12 +29,11 @@
 				<a href="#" class="bucket-selected">week</a>
 				<a href="#">month</a>
 				<a href="#">season</a>
-				<div style="margin: 1% 0 1% 1%; font-weight: normal">showing stats for Oct 14</div>
 			</div>
 		</div>
 		<div id="summary" class="summary">
 			<div class="summary-pane active-pane">
-				<div class="summary-label">Games Played</div>
+				<div class="summary-label">Overview</div>
 				<div class="summary-value">XX (+Y%)</div>
 				<div class="summary-note">Season start: XX (+Y%)</div>
 				<div class="summary-note">League average: XX (+Y%)</div>
@@ -42,7 +41,7 @@
 <!--				<div class="summary-value" ng-bind="summary_value(timeseries.gamesPlayed)"></div> -->
 			</div>
 			<div class="summary-pane">
-				<div class="summary-label">Win rate</div>
+				<div class="summary-label">Player vs player</div>
 				<div class="summary-value">XX (+Y%)</div>
 				<div class="summary-note">Season start: XX (+Y%)</div>
 				<div class="summary-note">League average: XX (+Y%)</div>
@@ -50,14 +49,14 @@
 <!--				<div class="summary-value" ng-bind="summary_value(timeseries.kda)"></div> -->
 			</div>
 			<div class="summary-pane">
-				<div class="summary-label">KDA</div>
+				<div class="summary-label">Vision</div>
 				<div class="summary-value">XX (+Y%)</div>
 				<div class="summary-note">Season start: XX (+Y%)</div>
 				<div class="summary-note">League average: XX (+Y%)</div>
 				<div class="summary-note">Global average: XX (+Y%)</div>
 			</div>
 			<div class="summary-pane">
-				<div class="summary-label">Minions Killed</div>
+				<div class="summary-label">Gold</div>
 				<div class="summary-value">XX (+Y%)</div>
 				<div class="summary-note">Season start: XX (+Y%)</div>
 				<div class="summary-note">League average: XX (+Y%)</div>
@@ -65,7 +64,7 @@
 <!--				<div class="summary-value" ng-bind="summary_value(timeseries.minionsKilled)"></div> -->
 			</div>
 			<div class="summary-pane">
-				<div class="summary-label">Gold earned</div>
+				<div class="summary-label">Champion pool</div>
 				<div class="summary-value">XX (+Y%)</div>
 				<div class="summary-note">Season start: XX (+Y%)</div>
 				<div class="summary-note">League average: XX (+Y%)</div>
@@ -73,8 +72,22 @@
 			</div>
 		</div>
 		<div id="detail-view" class="detail-view">
+			<div class="detailed-view" ng-controller="ReportingController" metric="gamesPlayed">
+				<div class="metric-overview">
+					<p class="metric-name">{{metric.name}}</p>
+					<p class="metric-subtext">{{metric.subtext}}</p>
+					<p class="metric-value">{{metric.value}}</p>
+					<p class="metric-context">{{metric.context}}</p>
+				</div>
+				
+				<div class="visualization">
+					<div class="axis" id="gamedPlayed-yaxis"></div>
+					<div class="chart" id="gamedPlayed-chart"></div>
+				</div>
+			</div>
+			
 			<!-- Standard element -->
-			<div class="detailed-view" ng-controller="ReportingController">
+			<div class="detailed-view" ng-controller="ReportingController" metric="kda">
 				<div class="metric-overview">
 					<p class="metric-name">{{metric.name}}</p>
 					<p class="metric-subtext">{{metric.subtext}}</p>
@@ -88,92 +101,49 @@
 				</div>
 			</div>
 			
-			<div class="detailed-view">
+			<div class="detailed-view" ng-controller="ReportingController" metric="wardsPlaced">
 				<div class="metric-overview">
-					<p class="metric-name">Minion kills</p>
-					<p class="metric-subtext">Minions killed per game</p>
-					<p class="metric-value">214</p>
-					<p class="metric-context">above average for your rank</p>
+					<p class="metric-name">{{metric.name}}</p>
+					<p class="metric-subtext">{{metric.subtext}}</p>
+					<p class="metric-value">{{metric.value}}</p>
+					<p class="metric-context">{{metric.context}}</p>
 				</div>
 				
-				<div class="chart" id="specific-chart"></div>
+				<div class="visualization">
+					<div class="axis" id="wardsPlaced-yaxis"></div>
+					<div class="chart" id="wardsPlaced-chart"></div>
+				</div>
 			</div>
 			
-			<!-- Games played heatmap -->
-			<div class="time-heatmap fullwidth-component">
-			<h3>Games played over time</h3>
-			<table class="heatmap">
-				<tr><td class="heatmap-3">&nbsp;</td><td class="heatmap-3">&nbsp;</td><td class="heatmap-4">&nbsp;</td><td class="heatmap-5">&nbsp;</td><td>&nbsp;</td>
-				    <td class="heatmap-2">&nbsp;</td><td class="heatmap-2">&nbsp;</td><td class="heatmap-4">&nbsp;</td><td class="heatmap-5">&nbsp;</td><td>&nbsp;</td>
-				    <td>&nbsp;</td><td>&nbsp;</td><td class="heatmap-1">&nbsp;</td><td>&nbsp;</td><td class="heatmap-4">&nbsp;</td>
-				    <td class="heatmap-5">&nbsp;</td><td class="heatmap-5">&nbsp;</td><td class="heatmap-4">&nbsp;</td><td class="heatmap-4">&nbsp;</td><td class="heatmap-4">&nbsp;</td>
-				    <td>&nbsp;</td><td>&nbsp;</td><td class="heatmap-2">&nbsp;</td><td class="heatmap-3">&nbsp;</td><td class="heatmap-2">&nbsp;</td>
-				    <td class="heatmap-4">&nbsp;</td><td class="heatmap-4">&nbsp;</td><td class="heatmap-5">&nbsp;</td><td class="heatmap-4">&nbsp;</td><td class="heatmap-3">&nbsp;</td></tr>
-			</table>
+			<div class="detailed-view" ng-controller="ReportingController" metric="minionKills">
+				<div class="metric-overview">
+					<p class="metric-name">{{metric.name}}</p>
+					<p class="metric-subtext">{{metric.subtext}}</p>
+					<p class="metric-value">{{metric.value}}</p>
+					<p class="metric-context">{{metric.context}}</p>
+				</div>
+				
+				<div class="visualization">
+					<div class="axis" id="minionKills-yaxis"></div>
+					<div class="chart" id="minionKills-chart"></div>
+				</div>
 			</div>
-			
-			<!-- Most played champions -->
-			<div class="halfwidth-component">
-			<h3>Most played champions</h3>
-			<div class="card_item">
-				<div class="item_title horizontal_stack">Renekton</div>
-				<div class="item_score horizontal_stack">27 games</div>
-			</div>
-			<div class="card_item">
-				<div class="item_title horizontal_stack">Alistar</div>
-				<div class="item_score horizontal_stack">11 games</div>
-			</div>
-			<div class="card_item">
-				<div class="item_title horizontal_stack">Nami</div>
-				<div class="item_score horizontal_stack">9 games</div>
-			</div>
-			</div>
-			
-			<!-- Top companions -->
-			<div class="halfwidth-component">
-			<h3>Most common teammates</h3>
-			<div class="card_item">
-				<div class="item_title horizontal_stack">BrandAid</div>
-				<div class="item_score horizontal_stack">27 games</div>
-			</div>
-			<div class="card_item">
-				<div class="item_title horizontal_stack">itsmehannahp</div>
-				<div class="item_score horizontal_stack">11 games</div>
-			</div>
-			<div class="card_item">
-				<div class="item_title horizontal_stack">Margrut</div>
-				<div class="item_score horizontal_stack">9 games</div>
-			</div>
-			</div>
-			
-			<!-- Champions played -->
-			<div class="time-heatmap fullwidth-component">
-			<h3>Champions played</h3>
-			<table class="champion_table">
-				<tr>
-					<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
-					<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
-					<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
-				</tr>
-				<tr>
-					<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
-					<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
-					<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
-				</tr>
-				<tr>
-					<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
-					<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
-					<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
-				</tr>
-				<tr>
-					<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
-					<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
-					<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
-				</tr>
-			</table>
-			</div>
+
+			<div class="detailed-view" ng-controller="ReportingController" metric="championVariance">
+				<div class="metric-overview">
+					<p class="metric-name">{{metric.name}}</p>
+					<p class="metric-subtext">{{metric.subtext}}</p>
+					<p class="metric-value">{{metric.value}}</p>
+					<p class="metric-context">{{metric.context}}</p>
+				</div>
+				
+				<div class="visualization">
+					<div class="axis" id="championVariance-yaxis"></div>
+					<div class="chart" id="championVariance-chart"></div>
+				</div>
+			</div>			
 		</div>
-		<div id="footer">summoner last updated on Jan 1, 1970</div>
+		<div id="footer">footer</div>
 	</body>
 
 </html>
