@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"proto"
 	"switchboard"
-	"text/template"
 )
 
 type FrontendStatsRequest struct {
