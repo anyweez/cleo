@@ -31,8 +31,8 @@
 				<a href="#">season</a>
 			</div>
 		</div>
-		<div id="summary" class="summary">
-			<div class="summary-pane active-pane">
+		<div id="summary" class="summary" ng-controller="SummaryController">
+			<div id="overview-tab" class="summary-pane active-pane" ng-click="changeTo('overview')">
 				<div class="summary-label">Overview</div>
 				<div class="summary-value">XX (+Y%)</div>
 				<div class="summary-note">Season start: XX (+Y%)</div>
@@ -40,7 +40,7 @@
 				<div class="summary-note">Global average: XX (+Y%)</div>
 <!--				<div class="summary-value" ng-bind="summary_value(timeseries.gamesPlayed)"></div> -->
 			</div>
-			<div class="summary-pane">
+			<div id="pvp-tab" class="summary-pane" ng-click="changeTo('pvp')">
 				<div class="summary-label">Player vs player</div>
 				<div class="summary-value">XX (+Y%)</div>
 				<div class="summary-note">Season start: XX (+Y%)</div>
@@ -48,14 +48,14 @@
 				<div class="summary-note">Global average: XX (+Y%)</div>
 <!--				<div class="summary-value" ng-bind="summary_value(timeseries.kda)"></div> -->
 			</div>
-			<div class="summary-pane">
+			<div id="vision-tab" class="summary-pane" ng-click="changeTo('vision')">
 				<div class="summary-label">Vision</div>
 				<div class="summary-value">XX (+Y%)</div>
 				<div class="summary-note">Season start: XX (+Y%)</div>
 				<div class="summary-note">League average: XX (+Y%)</div>
 				<div class="summary-note">Global average: XX (+Y%)</div>
 			</div>
-			<div class="summary-pane">
+			<div id="gold-tab" class="summary-pane" ng-click="changeTo('gold')">
 				<div class="summary-label">Gold</div>
 				<div class="summary-value">XX (+Y%)</div>
 				<div class="summary-note">Season start: XX (+Y%)</div>
@@ -63,7 +63,7 @@
 				<div class="summary-note">Global average: XX (+Y%)</div>
 <!--				<div class="summary-value" ng-bind="summary_value(timeseries.minionsKilled)"></div> -->
 			</div>
-			<div class="summary-pane">
+			<div id="champions-tab" class="summary-pane" ng-click="changeTo('champions')">
 				<div class="summary-label">Champion pool</div>
 				<div class="summary-value">XX (+Y%)</div>
 				<div class="summary-note">Season start: XX (+Y%)</div>
@@ -71,7 +71,9 @@
 				<div class="summary-note">Global average: XX (+Y%)</div>
 			</div>
 		</div>
-		<div id="detail-view" class="detail-view">
+
+		<!-- Overview tab -->
+		<div id="overview-details" class="detail-view active-view">
 			<div class="detailed-view" ng-controller="ReportingController" metric="gamesPlayed">
 				<div class="metric-overview">
 					<p class="metric-name">{{metric.name}}</p>
@@ -142,7 +144,65 @@
 					<div class="chart" id="championVariance-chart"></div>
 				</div>
 			</div>			
+</div>
+
+		<!-- PvP tab -->
+		<div id="pvp-details" class="detail-view">
+			<div class="detailed-view" ng-controller="ReportingController" metric="kda">
+				<div class="metric-overview">
+					<p class="metric-name">{{metric.name}}</p>
+					<p class="metric-subtext">{{metric.subtext}}</p>
+					<p class="metric-value">{{metric.value}}</p>
+					<p class="metric-context">{{metric.context}}</p>
+				</div>
+				
+				<div class="visualization">
+					<div class="axis" id="gamedPlayed-yaxis"></div>
+					<div class="chart" id="gamedPlayed-chart"></div>
+				</div>
+			</div>
+			
+			<div class="detailed-view" ng-controller="ReportingController" metric="kills">
+				<div class="metric-overview">
+					<p class="metric-name">{{metric.name}}</p>
+					<p class="metric-subtext">{{metric.subtext}}</p>
+					<p class="metric-value">{{metric.value}}</p>
+					<p class="metric-context">{{metric.context}}</p>
+				</div>
+				
+				<div class="visualization">
+					<div class="axis" id="wardsPlaced-yaxis"></div>
+					<div class="chart" id="wardsPlaced-chart"></div>
+				</div>
+			</div>
+			
+			<div class="detailed-view" ng-controller="ReportingController" metric="deaths">
+				<div class="metric-overview">
+					<p class="metric-name">{{metric.name}}</p>
+					<p class="metric-subtext">{{metric.subtext}}</p>
+					<p class="metric-value">{{metric.value}}</p>
+					<p class="metric-context">{{metric.context}}</p>
+				</div>
+				
+				<div class="visualization">
+					<div class="axis" id="minionKills-yaxis"></div>
+					<div class="chart" id="minionKills-chart"></div>
+				</div>
+			</div>
 		</div>
+
+		<!-- Vision tab -->
+		<div id="vision-details" class="detail-view">
+		</div>
+		
+		<!-- Gold tab -->
+		<div id="gold-details" class="detail-view">
+		</div>
+		
+		<!-- Champion tab -->
+		<div id="champions-details" class="detail-view">
+		</div>
+
 		<div id="footer">footer</div>
 	</body>
 

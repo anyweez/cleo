@@ -2,15 +2,18 @@ package main
 
 import (
 	"bufio"
+//	"bytes"
 	gproto "code.google.com/p/goprotobuf/proto"
 	data "datamodel"
 	"encoding/json"
 	"fmt"
+//	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"proto"
 	"switchboard"
+//	"text/template"
 )
 
 type FrontendStatsRequest struct {
@@ -18,6 +21,10 @@ type FrontendStatsRequest struct {
 	Player        data.PlayerType
 	Records       data.SummonerRecord
 }
+
+//type IndexTemplate struct {
+//	OverviewTab		string
+//}
 
 // Switchboard to be used by all of the goroutines.
 var lookup switchboard.SwitchboardClient
@@ -133,6 +140,21 @@ func summoner_handler(w http.ResponseWriter, r *http.Request) {
 
 func index_handler(w http.ResponseWriter, r *http.Request) {
 	log.Println("index requested")
+
+/*
+	it := IndexTemplate{}
+	// Overview tab
+	ovt, _ := ioutil.ReadFile("html.stats/static/overview-tab.html")
+	it.OverviewTab = string(ovt)
+	
+	tmpl := template.New("index").Delims("<<", ">>")
+	tmpl, _ = tmpl.ParseFiles("html.stats/index.html")
+	output := bytes.NewBufferString("")
+	
+	tmpl.Execute(output, it)
+	log.Println( len(output.String()) )
+	fmt.Fprintf(w, output.String())
+	*/
 	http.ServeFile(w, r, "html.stats/index.html")
 }
 

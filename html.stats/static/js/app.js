@@ -31,33 +31,7 @@ function timeline(metric, records) {
 		$scope.validSummoner = false;
 		$scope.metrics = [];
 		$scope.dates = [];
-		
-		/*
-		$scope.summary_value = function(metric) {
-			if (metric == null) {
-				return "XX (+X%)"
-			}
-			
-			var latest = "0000";
-			var second_latest = "0000";
-			for (var date_string in metric) {
-				if (date_string > latest) {
-					second_latest = latest;
-					latest = date_string;
-				}
-			}
-			
-			var delta = (metric[latest] / metric[second_latest]) - 1;
-			
-			if (delta > 0) {
-				return metric[latest] + " (+" + Math.round(delta * 100) / 10 + "%)";
-			}
-			else {
-				return metric[latest] + " (" + Math.round(delta * 1000) / 10 + "%)";	
-			}
-		}
-		*/
-		
+				
 		// This should make a request to get the JSON response for the provided
 		// summoner.
 		$scope.requestSummoner = function() {			
@@ -87,6 +61,25 @@ function timeline(metric, records) {
 		}
 		
 		$scope.requestSummoner();
+	});
+	
+	app.controller("SummaryController", function($scope) {
+		// Set the default.
+		var active_tab = document.getElementById("overview-tab");
+		var active_page = document.getElementById("overview-details");
+		
+		$scope.changeTo = function(target_tab) {
+			console.log("Activating " + target_tab);
+			// Remove the 'active-pane' class from the currently active page.
+			active_tab.className = "summary-pane";
+			active_page.className = "detail-view";
+			
+			// Add the 'active-pane' class to the newly active page.
+			active_tab = document.getElementById(target_tab + "-tab");
+			active_tab.className += " active-pane";
+			active_page = document.getElementById(target_tab + "-details");
+			active_page.className += " active-view";			
+		}
 	});
 	
 	/**

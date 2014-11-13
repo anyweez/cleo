@@ -163,6 +163,11 @@ input[type=text] {
 	padding: 1%;
 	border: 0px solid black;
 	border-width: 0px 2px 2px 2px;
+	display: none;
+}
+
+.active-view {
+	display: block;
 }
 
 .heatmap {
