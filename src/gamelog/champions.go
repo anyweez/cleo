@@ -1,124 +1,124 @@
 package gamelog
 
 const (
-	UNKNOWN      = iota
-	ALISTAR      = iota
-	ANNIE        = iota
-	ASHE         = iota
-	FIDDLESTICKS = iota
-	JAX          = iota
-	KAYLE        = iota
-	MASTER_YI    = iota
-	MORGANA      = iota
-	NUNU         = iota
-	RYZE         = iota
-	SION         = iota
-	SIVIR        = iota
-	SORAKA       = iota
-	TEEMO        = iota
-	TRISTANA     = iota
-	TWISTED_FATE = iota
-	WARWICK      = iota
-	SINGED       = iota
-	ZILEAN       = iota
-	EVELYN       = iota
-	TWITCH       = iota
-	TRYNDAMERE   = iota
-	KARTHUS      = iota
-	CHOGATH      = iota
-	AMUMU        = iota
-	ANIVIA       = iota
-	RAMMUS       = iota
-	VEIGAR       = iota
-	KASSADIN     = iota
-	GANGPLANK    = iota
-	TARIC        = iota
-	MALPHITE     = iota
-	JANNA        = iota
-	BLITZCRANK   = iota
-	DR_MUNDO     = iota
-	KATARINA     = iota
-	CORKI        = iota
-	NASUS        = iota
-	HEIMERDINGER = iota
-	SHACO        = iota
-	UDYR         = iota
-	NIDALEE      = iota
-	POPPY        = iota
-	GRAGAS       = iota
-	PANTHEON     = iota
-	MORDEKAISER  = iota
-	EZREAL       = iota
-	SHEN         = iota
-	KENNEN       = iota
-	GAREN        = iota
-	AKALI        = iota
-	MALZAHAR     = iota
-	OLAF         = iota
-	KOGMAW       = iota
-	XIN_ZHAO     = iota
-	VLADMIR      = iota
-	GALIO        = iota
-	URGOT        = iota
-	MISS_FORTUNE = iota
-	SONA         = iota
-	SWAIN        = iota
-	LUX          = iota
-	LEBLANC      = iota
-	IRELIA       = iota
-	TRUNDLE      = iota
-	CASSIOPEIA   = iota
-	CAITLYN      = iota
-	RENEKTON     = iota
-	KARMA        = iota
-	MAOKAI       = iota
-	JARVAN_IV    = iota
-	NOCTURNE     = iota
-	LEE_SIN      = iota
-	BRAND        = iota
-	RUMBLE       = iota
-	VAYNE        = iota
-	ORIANNA      = iota
-	YORICK       = iota
-	LEONA        = iota
-	WUKONG       = iota
-	SKARNER      = iota
-	TALON        = iota
-	RIVEN        = iota
-	XERATH       = iota
-	GRAVES       = iota
-	SHYVANA      = iota
-	FIZZ         = iota
-	VOLIBEAR     = iota
-	AHRI         = iota
-	VIKTOR       = iota
-	SEJUANI      = iota
-	ZIGGS        = iota
-	NAUTILUS     = iota
-	FIORA        = iota
-	LULU         = iota
-	HECARIM      = iota
-	VARUS        = iota
-	DARIUS       = iota
-	DRAVEN       = iota
-	JAYCE        = iota
-	ZYRA         = iota
-	DIANA        = iota
-	RENGAR       = iota
-	SYNDRA       = iota
-	KHAZIX       = iota
-	ELISE        = iota
-	ZED          = iota
-	NAMI         = iota
-	VI           = iota
-	THRESH       = iota
-	QUINN        = iota
-	ZAC          = iota
-	LISSANDRA    = iota
-	AATROX       = iota
-	LUCIAN       = iota
-	JINX         = iota
-	YASUO        = iota
-	VELKOZ       = iota
-	BRAUM        = iota
+        UNKNOWN = iota
+        ALISTAR
+        ANNIE
+        ASHE
+        FIDDLESTICKS
+        JAX
+        KAYLE
+        MASTER_YI
+        MORGANA
+        NUNU
+        RYZE
+        SION
+        SIVIR
+        SORAKA
+        TEEMO
+        TRISTANA
+        TWISTED_FATE
+        WARWICK
+        SINGED
+        ZILEAN
+        EVELYN
+        TWITCH
+        TRYNDAMERE
+        KARTHUS
+        CHOGATH
+        AMUMU
+        ANIVIA
+        RAMMUS
+        VEIGAR
+        KASSADIN
+        GANGPLANK
+        TARIC
+        MALPHITE
+        JANNA
+        BLITZCRANK
+        DR_MUNDO
+        KATARINA
+        CORKI
+        NASUS
+        HEIMERDINGER
+        SHACO
+        UDYR
+        NIDALEE
+        POPPY
+        GRAGAS
+        PANTHEON
+        MORDEKAISER
+        EZREAL
+        SHEN
+        KENNEN
+        GAREN
+        AKALI
+        MALZAHAR
+        OLAF
+        KOGMAW
+        XIN_ZHAO
+        VLADMIR
+        GALIO
+        URGOT
+        MISS_FORTUNE
+        SONA
+        SWAIN
+        LUX
+        LEBLANC
+        IRELIA
+        TRUNDLE
+        CASSIOPEIA
+        CAITLYN
+        RENEKTON
+        KARMA
+        MAOKAI
+        JARVAN_IV
+        NOCTURNE
+        LEE_SIN
+        BRAND
+        RUMBLE
+        VAYNE
+        ORIANNA
+        YORICK
+        LEONA
+        WUKONG
+        SKARNER
+        TALON
+        RIVEN
+        XERATH
+        GRAVES
+        SHYVANA
+        FIZZ
+        VOLIBEAR
+        AHRI
+        VIKTOR
+        SEJUANI
+        ZIGGS
+        NAUTILUS
+        FIORA
+        LULU
+        HECARIM
+        VARUS
+        DARIUS
+        DRAVEN
+        JAYCE
+        ZYRA
+        DIANA
+        RENGAR
+        SYNDRA
+        KHAZIX
+        ELISE
+        ZED
+        NAMI
+        VI
+        THRESH
+        QUINN
+        ZAC
+        LISSANDRA
+        AATROX
+        LUCIAN
+        JINX
+        YASUO
+        VELKOZ
+        BRAUM
 )
